@@ -1,0 +1,69 @@
+# 가상환경 (venv, .env 등)
+.venv/
+env/
+venv/
+ENV/
+*.env
+
+# Python 컴파일 결과
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Jupyter Notebook 체크포인트
+.ipynb_checkpoints/
+
+# 로그 파일
+*.log
+
+# 시스템 파일
+.DS_Store
+Thumbs.db
+
+# IDE 설정 (PyCharm, VSCode 등)
+.vscode/
+.idea/
+
+# 모델 및 훈련 파일
+*.h5
+*.tflite
+*.pb
+*.pkl
+*.onnx
+*.ckpt
+checkpoint/
+saved_model/
+
+# 사용자 데이터
+*.npy
+*.csv
+*.json
+
+# 데이터셋
+dataset/
+data/
+*.zip
+
+# 결과 이미지, 영상
+output/
+results/
+*.jpg
+*.png
+*.mp4
+*.avi
+
+# 서버 배포 관련 임시파일
+__pycache__/
+*.db
+*.sqlite3
+*.pid
+*.sock
+*.gz
+*.bak
+*.tmp
+
+# FastAPI/Uvicorn
+*.log
+*.pid
+*.db
+*.sqlite3
