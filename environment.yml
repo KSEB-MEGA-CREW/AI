@@ -1,16 +1,15 @@
 name: KSEB
 channels:
   - defaults
-  - https://repo.anaconda.com/pkgs/main
-  - https://repo.anaconda.com/pkgs/r
-  - https://repo.anaconda.com/pkgs/msys2
 dependencies:
   - blas=1.0=mkl
   - bottleneck=1.4.2=py310hc99e966_0
   - bzip2=1.0.8=h2bbff1b_6
   - ca-certificates=2025.2.25=haa95532_0
   - expat=2.7.1=h8ddb27b_0
+  - icc_rt=2022.1.0=h6049295_2
   - intel-openmp=2023.1.0=h59b6b97_46320
+  - joblib=1.4.2=py310haa95532_0
   - libffi=3.4.4=hd77b12b_1
   - mkl=2023.1.0=h6b88ed4_46358
   - mkl-service=2.4.0=py310h827c3e9_2
@@ -24,10 +23,13 @@ dependencies:
   - python-dateutil=2.9.0post0=py310haa95532_2
   - python-tzdata=2025.2=pyhd3eb1b0_0
   - pytz=2024.1=py310haa95532_0
+  - scikit-learn=1.6.1=py310h585ebfc_0
+  - scipy=1.15.3=py310h180bac5_0
   - setuptools=72.1.0=py310haa95532_0
   - six=1.17.0=py310haa95532_0
   - sqlite=3.45.3=h2bbff1b_0
   - tbb=2021.8.0=h59b6b97_0
+  - threadpoolctl=3.5.0=py310h9909e9c_0
   - tk=8.6.14=h5e9d12e_1
   - tzdata=2025b=h04d1e81_0
   - vc=14.42=haa95532_5
@@ -96,4 +98,4 @@ dependencies:
       - urllib3==2.5.0
       - werkzeug==3.1.3
       - wrapt==1.17.2
-prefix: C:\Users\Hyuk\anaconda3\envs\KSEB
+prefix: C:\Users\cksgu\anaconda3\envs\KSEB
