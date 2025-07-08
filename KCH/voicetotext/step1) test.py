@@ -12,7 +12,7 @@ api_key = os.getenv("OPENAI_API_KEY")
 openai.api_key = api_key
 
 # 4. 변환하고 싶은 m4a 파일 경로
-audio_file_path = "test.m4a"
+audio_file_path ="test.m4a"
 
 # 5. 파일 열고 Whisper API 호출
 with open(audio_file_path, "rb") as audio_file:
