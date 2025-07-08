@@ -127,4 +127,4 @@ dependencies:
       - urllib3==2.5.0
       - werkzeug==3.1.3
       - wrapt==1.17.2
-prefix: C:\Users\cksgu\anaconda3\envs\KSEB
+prefix: C:\Users\cksgu\anaconda3\env\KSEB
