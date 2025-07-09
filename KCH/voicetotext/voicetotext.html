@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <title>음성 → 텍스트 변환(자동 무음 종료)</title>
+  <style>
+    body { font-family: Pretendard, sans-serif; background: #f6f6f6; padding: 40px; }
+    .box { background: #fff; padding: 24px 28px 32px 28px; border-radius: 16px; box-shadow: 0 2px 8px #0001; max-width: 400px; margin: auto; }
+    #result { margin-top: 24px; padding: 14px; background: #eee; border-radius: 8px; font-size: 1.2em; min-height: 60px;}
+    label { font-weight: bold; }
+    button { font-size: 1.2em; padding: 10px 18px; border-radius: 8px;}
+  </style>
+</head>
+<body>
+  <div class="box">
+    <h2>음성 → 텍스트 변환<br><small>(2초 무음시 자동 종료)</small></h2>
+    <button id="recordBtn">녹음 시작</button>
+    <div id="status" style="color:#2566c1;min-height:30px;"></div>
+    <div id="result">여기에 결과가 표시됩니다.</div>
+  </div>
+  <script>
+    let mediaRecorder, audioChunks = [], recording = false, silenceTimer = null, audioContext, source, processor;
+
+    const recordBtn = document.getElementById('recordBtn');
+    const resultDiv = document.getElementById('result');
+    const statusDiv = document.getElementById('status');
+
+    function handleVolume(event) {
+      const input = event.inputBuffer.getChannelData(0);
+      const sum = input.reduce((acc, val) => acc + Math.abs(val), 0);
+      const avg = sum / input.length;
+      if (avg < 0.01) { // 무음
+        if (!silenceTimer) {
+          silenceTimer = setTimeout(() => stopRecording(), 2000); // 2초 무음
+        }
+      } else {
+        if (silenceTimer) {
+          clearTimeout(silenceTimer);
+          silenceTimer = null;
+        }
+      }
+    }
+
+    recordBtn.onclick = async function() {
+      if (recording) return;
+      resultDiv.textContent = "";
+      statusDiv.textContent = "녹음 중...(2초 무음이면 자동 종료)";
+      audioChunks = [];
+      recording = true;
+      recordBtn.disabled = true;
+
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      mediaRecorder = new MediaRecorder(stream);
+      mediaRecorder.ondataavailable = e => { if (e.data.size > 0) audioChunks.push(e.data); };
+
+      mediaRecorder.onstop = async function() {
+        stream.getTracks().forEach(track => track.stop());
+        if (audioContext) audioContext.close();
+        recording = false;
+        recordBtn.disabled = false;
+        statusDiv.textContent = "변환 중...";
+        const audioBlob = new Blob(audioChunks, { type: "audio/webm" });
+        const formData = new FormData();
+        formData.append("file", audioBlob, "voice.webm");
+        try {
+          const res = await fetch("http://localhost:8000/stt/", { method: "POST", body: formData });
+          const data = await res.json();
+          resultDiv.textContent = data.text || "(결과 없음)";
+          statusDiv.textContent = "완료!";
+        } catch (e) {
+          resultDiv.textContent = "오류: " + e.message;
+        }
+      };
+
+      audioContext = new (window.AudioContext || window.webkitAudioContext)();
+      source = audioContext.createMediaStreamSource(stream);
+      processor = audioContext.createScriptProcessor(4096, 1, 1);
+      processor.onaudioprocess = handleVolume;
+      source.connect(processor);
+      processor.connect(audioContext.destination);
+
+      mediaRecorder.start();
+    };
+
+    function stopRecording() {
+      if (mediaRecorder && recording) {
+        mediaRecorder.stop();
+        statusDiv.textContent = "변환 중...";
+      }
+      if (silenceTimer) {
+        clearTimeout(silenceTimer);
+        silenceTimer = null;
+      }
+      if (processor) processor.disconnect();
+      if (source) source.disconnect();
+    }
+  </script>
+</body>
+</html>
