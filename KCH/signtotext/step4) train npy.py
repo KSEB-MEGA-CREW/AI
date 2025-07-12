@@ -4,7 +4,7 @@ from sklearn.model_selection import train_test_split
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import Conv1D, MaxPooling1D, BatchNormalization, Dropout, Flatten, Dense
 from tensorflow.keras.utils import to_categorical
-from tensorflow.keras.callbacks import EarlyStopping
+from tensorflow.keras.callbacks import EarlyStopping, ReduceLROnPlateau
 from collections import defaultdict
 import json
 import random
@@ -18,7 +18,7 @@ matplotlib.rcParams['axes.unicode_minus'] = False
 DATA_PATH = "output_npy"
 required_frames = 35
 expected_len = 194
-SAMPLE_COUNT = 108  # 각 라벨당 108개만 사용
+SAMPLE_COUNT = 306    # 각 라벨당 108개만 사용
 random.seed(42)
 
 # 1. 라벨별 파일 분류
@@ -30,7 +30,7 @@ for fname in os.listdir(DATA_PATH):
 
 # 2. 108개 이상인 라벨만 사용
 selected_labels = [label for label, files in label_files.items() if len(files) >= SAMPLE_COUNT]
-print(f"108개 이상 라벨({len(selected_labels)}개):", selected_labels)
+print(f"{SAMPLE_COUNT}개 이상 라벨({len(selected_labels)}개):", selected_labels)
 
 # 3. 각 라벨당 108개 랜덤 추출
 sequences, labels = [], []
@@ -92,12 +92,13 @@ model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accur
 
 # 6. 학습
 early_stop = EarlyStopping(monitor='val_loss', patience=8, restore_best_weights=True)
+reduce_lr = ReduceLROnPlateau(monitor='val_loss', factor=0.5, patience=4, min_lr=1e-5, verbose=1)
 history = model.fit(
     X_train, y_train,
     validation_data=(X_test, y_test),
     epochs=80,
     batch_size=16,
-    callbacks=[early_stop],
+    callbacks=[early_stop, reduce_lr],
     verbose=1
 )
 
