@@ -45,6 +45,7 @@ data/
 *.zip
 
 # 결과 이미지, 영상
+output_npy/
 output/
 results/
 *.jpg

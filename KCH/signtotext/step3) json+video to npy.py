@@ -1,19 +1,42 @@
+import os
+import json
+from collections import Counter, defaultdict
+
+### ===== [1] 데이터 경로 및 파라미터 =====
+ROOT_DIR = "NIKL_Sign Language Parallel Corpus_2024_LI_CO"  # 최상위 폴더명(변경)
+VIDEO_EXTS = [".mp4", ".avi", ".mov"]  # 비디오 확장자
+OUTPUT_DIR = "output_npy"
+os.makedirs(OUTPUT_DIR, exist_ok=True)
+N_TOP_LABELS = 100   # [★] 상위 N개 라벨로만 추출
+
+POSE_INDEXES = list(range(17))   # 하체 제외 (프로젝트 구조에 맞게 수정)
+expected_len = 21*3 + 21*3 + 17*4
+
+### ===== [2] gloss별 등장 횟수 집계 =====
+gloss_counter = Counter()
+json_paths = []
+
+# 하위 폴더까지 모두 탐색
+for root, dirs, files in os.walk(ROOT_DIR):
+    for file in files:
+        if file.endswith(".json"):
+            json_path = os.path.join(root, file)
+            json_paths.append(json_path)
+            with open(json_path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            gestures = data.get("sign_script", {}).get("sign_gestures_strong", [])
+            for gloss in gestures:
+                gloss_id = str(gloss.get("gloss_id", "")).replace('.npy', '').replace('.NPY', '')
+                gloss_counter[gloss_id] += 1
+
+# 상위 N개 라벨 선정
+top_gloss = [g for g, c in gloss_counter.most_common(N_TOP_LABELS)]
+print(f"✅ 상위 {N_TOP_LABELS}개 gloss 선정: {top_gloss[:10]} ...")
+
+### ===== [3] npy 변환(상위 라벨만) =====
 import cv2
 import mediapipe as mp
 import numpy as np
-import json
-import os
-
-# ① 설정
-folder = "2024_LI_DC_0779230-0789690_1035"
-output_dir = "output_npy"
-os.makedirs(output_dir, exist_ok=True)
-POSE_INDEXES = list(range(17))
-expected_len = 21*3 + 21*3 + 17*4
-
-# ② 파일ID 생성 (VXPAKOKS240779230부터 10씩 증가, 원하는 개수만큼)
-start_num = 240779230
-file_count = 20  # 예시. 파일이 더 많으면 더 늘려도 됨
 
 def extract_landmarks(landmarks, dims, idxs=None):
     result = []
@@ -26,30 +49,28 @@ def extract_landmarks(landmarks, dims, idxs=None):
             result.extend(coords)
     return result
 
-# ③ 각 파일 처리
-for i in range(file_count):
-    base_id = f"VXPAKOKS{start_num + 10*i}"
-    for cam, cam_label in zip(['', 'L', 'R'], ['C', 'L', 'R']):  # ''=정면, L=왼쪽, R=오른쪽
-        json_file = os.path.join(folder, f"{base_id}.json")
-        video_file = os.path.join(folder, f"{base_id}{cam}.mp4")
-        if not (os.path.exists(json_file) and os.path.exists(video_file)):
-            print(f"⚠️ 파일 없음: {json_file} or {video_file}")
+count_npy = Counter()
+
+for json_path in json_paths:
+    with open(json_path, "r", encoding="utf-8") as f:
+        data = json.load(f)
+    fps = data["potogrf"]["fps"]
+    gestures = data.get("sign_script", {}).get("sign_gestures_strong", [])
+    base_id = os.path.splitext(os.path.basename(json_path))[0]
+    parent_dir = os.path.dirname(json_path)
+    # [!] 모든 각도 cam 추출 지원
+    for cam, cam_label in zip(['', 'L', 'R'], ['C', 'L', 'R']):
+        video_file = os.path.join(parent_dir, f"{base_id}{cam}.mp4")
+        if not os.path.exists(video_file):
             continue
 
-        print(f"▶ 처리중: {base_id}{cam} ({cam_label})")
-
-        with open(json_file, "r", encoding="utf-8") as f:
-            data = json.load(f)
-        fps = data["potogrf"]["fps"]
-        sign_gestures = data["sign_script"]["sign_gestures_strong"]
-
-        # 전체 프레임 keypoint 추출
+        # 전체 프레임 랜드마크 추출
         cap = cv2.VideoCapture(video_file)
         all_keypoints = []
         mp_holistic = mp.solutions.holistic
         with mp_holistic.Holistic(
-                min_detection_confidence=0.7,
-                min_tracking_confidence=0.7) as holistic:
+            min_detection_confidence=0.7,
+            min_tracking_confidence=0.7) as holistic:
             while True:
                 ret, frame = cap.read()
                 if not ret:
@@ -68,18 +89,20 @@ for i in range(file_count):
             cap.release()
         all_keypoints = np.array(all_keypoints)
 
-        # gloss별 npy로 저장 (gloss_id에 확장자 붙어있으면 제거!)
-        for gloss in sign_gestures:
+        # 각 gloss별로 npy 저장(상위 라벨만)
+        for gloss in gestures:
+            gloss_id = str(gloss.get("gloss_id", "")).replace('.npy', '').replace('.NPY', '')
+            if gloss_id not in top_gloss:
+                continue  # 상위 N개 라벨만 npy로 저장
+
             start_sec = gloss['start']
             end_sec = gloss['end']
-            gloss_id = gloss['gloss_id']
-            # 혹시라도 .npy 확장자가 있으면 제거
-            gloss_id_clean = str(gloss_id).replace('.npy', '').replace('.NPY', '')
-
             start_frame = int(round(start_sec * fps))
             end_frame = int(round(end_sec * fps))
             gloss_keypoints = all_keypoints[start_frame:end_frame+1]
-            out_name = f"{base_id}_{gloss_id_clean}_{cam_label}.npy"
-            out_path = os.path.join(output_dir, out_name)
+            out_name = f"{base_id}_{gloss_id}_{cam_label}.npy"
+            out_path = os.path.join(OUTPUT_DIR, out_name)
             np.save(out_path, gloss_keypoints)
-            print(f"  ⬇️ 저장: {out_path} (shape={gloss_keypoints.shape})")
+            count_npy[gloss_id] += 1
+
+print(f"✅ npy 변환 완료! (gloss별 npy개수: {count_npy.most_common(10)})")
