@@ -1,41 +1,27 @@
 import os
 import json
 from collections import Counter
-
-### ===== [1] 데이터 경로 및 파라미터 =====
-ROOT_DIR = "NIKL_Sign Language Parallel Corpus_2024_LI_CO"  # 최상위 폴더명(변경)
-OUTPUT_DIR = "output_npy"
-os.makedirs(OUTPUT_DIR, exist_ok=True)
-N_TOP_LABELS = 100   # 상위 N개 라벨로만 추출
-
-POSE_INDEXES = list(range(17))   # 하체 제외
-expected_len = 21*3 + 21*3 + 17*4
-
-### ===== [2] gloss별 등장 횟수 집계 =====
-gloss_counter = Counter()
-json_paths = []
-
-for root, dirs, files in os.walk(ROOT_DIR):
-    for file in files:
-        if file.endswith(".json"):
-            json_path = os.path.join(root, file)
-            json_paths.append(json_path)
-            with open(json_path, "r", encoding="utf-8") as f:
-                data = json.load(f)
-            gestures = data.get("sign_script", {}).get("sign_gestures_strong", [])
-            for gloss in gestures:
-                gloss_id = str(gloss.get("gloss_id", "")).replace('.npy', '').replace('.NPY', '')
-                gloss_counter[gloss_id] += 1
-
-# 상위 N개 라벨 선정
-top_gloss = [g for g, c in gloss_counter.most_common(N_TOP_LABELS)]
-print(f"✅ 상위 {N_TOP_LABELS}개 gloss 선정: {top_gloss[:10]} ...")
-
-### ===== [3] npy 변환(상위 라벨만, 중복시 건너뜀) =====
 import cv2
 import mediapipe as mp
 import numpy as np
 
+### ===== [1] 데이터 경로 및 파라미터 =====
+ROOT_DIR = "NIKL_Sign Language Parallel Corpus_2024_LI_CO"  # 최상위 폴더명(변경)
+VIDEO_EXTS = [".mp4", ".avi", ".mov"]
+OUTPUT_DIR = "output_npy"
+os.makedirs(OUTPUT_DIR, exist_ok=True)
+
+POSE_INDEXES = list(range(17))   # 하체 제외 (프로젝트 구조에 맞게 수정)
+expected_len = 21*3 + 21*3 + 17*4
+
+### ===== [2] gloss별 등장 횟수 집계 및 전체 json 경로 확보 =====
+json_paths = []
+for root, dirs, files in os.walk(ROOT_DIR):
+    for file in files:
+        if file.endswith(".json"):
+            json_paths.append(os.path.join(root, file))
+
+### ===== [3] npy 변환 =====
 def extract_landmarks(landmarks, dims, idxs=None):
     result = []
     if landmarks:
@@ -56,15 +42,38 @@ for json_path in json_paths:
     gestures = data.get("sign_script", {}).get("sign_gestures_strong", [])
     base_id = os.path.splitext(os.path.basename(json_path))[0]
     parent_dir = os.path.dirname(json_path)
+
     for cam, cam_label in zip(['', 'L', 'R'], ['C', 'L', 'R']):
         video_file = os.path.join(parent_dir, f"{base_id}{cam}.mp4")
         if not os.path.exists(video_file):
             continue
 
+        # --- 우선 모든 gloss마다 npy가 이미 있는지 먼저 체크 ---
+        gloss_save_info = []
+        for gloss in gestures:
+            gloss_id = str(gloss.get("gloss_id", "")).replace('.npy', '').replace('.NPY', '')
+            start_sec = gloss['start']
+            end_sec = gloss['end']
+            out_name = f"{base_id}_{gloss_id}_{cam_label}.npy"
+            out_path = os.path.join(OUTPUT_DIR, out_name)
+            if os.path.exists(out_path):
+                # 이미 npy 있으면 비디오 열지 않음!
+                print(f"▶ {out_name} 이미 존재, 저장 건너뜀")
+                continue
+            gloss_save_info.append({
+                "gloss_id": gloss_id,
+                "start_sec": start_sec,
+                "end_sec": end_sec,
+                "out_path": out_path
+            })
+
+        if not gloss_save_info:
+            continue  # 저장해야 할 게 없으면, 비디오도 열지 않음
+
+        # ---- [비디오 열기] 필요할 때만 ----
         cap = cv2.VideoCapture(video_file)
         all_keypoints = []
-        mp_holistic = mp.solutions.holistic
-        with mp_holistic.Holistic(
+        with mp.solutions.holistic.Holistic(
             min_detection_confidence=0.7,
             min_tracking_confidence=0.7) as holistic:
             while True:
@@ -85,26 +94,13 @@ for json_path in json_paths:
             cap.release()
         all_keypoints = np.array(all_keypoints)
 
-        # 각 gloss별로 npy 저장(상위 라벨만, 중복 파일 있으면 저장 안함)
-        for gloss in gestures:
-            gloss_id = str(gloss.get("gloss_id", "")).replace('.npy', '').replace('.NPY', '')
-            if gloss_id not in top_gloss:
-                continue
-
-            start_sec = gloss['start']
-            end_sec = gloss['end']
-            start_frame = int(round(start_sec * fps))
-            end_frame = int(round(end_sec * fps))
+        # ---- [npy 저장] ----
+        for info in gloss_save_info:
+            start_frame = int(round(info["start_sec"] * fps))
+            end_frame = int(round(info["end_sec"] * fps))
             gloss_keypoints = all_keypoints[start_frame:end_frame+1]
-            out_name = f"{base_id}_{gloss_id}_{cam_label}.npy"
-            out_path = os.path.join(OUTPUT_DIR, out_name)
-
-            # 이미 존재하면 skip
-            if os.path.exists(out_path):
-                print(f"▶ {out_name} 이미 존재, 저장 건너뜀")
-                continue
-
-            np.save(out_path, gloss_keypoints)
-            count_npy[gloss_id] += 1
+            np.save(info["out_path"], gloss_keypoints)
+            count_npy[info["gloss_id"]] += 1
+            print(f"✅ {os.path.basename(info['out_path'])} 저장 완료 ({gloss_keypoints.shape})")
 
 print(f"✅ npy 변환 완료! (gloss별 npy개수: {count_npy.most_common(10)})")
