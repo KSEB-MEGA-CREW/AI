@@ -6,14 +6,14 @@ import os
 
 # ① 설정
 folder = "2024_LI_DC_0779230-0789690_1035"
-output_dir = "output_npy"
+output_dir = "등수"
 os.makedirs(output_dir, exist_ok=True)
 POSE_INDEXES = list(range(17))
 expected_len = 21*3 + 21*3 + 17*4
 
 # ② 파일ID 생성 (VXPAKOKS240779230부터 10씩 증가, 원하는 개수만큼)
-start_num = 240779230
-file_count = 20  # 예시. 파일이 더 많으면 더 늘려도 됨
+start_num = 240779260
+file_count = 1  # 예시. 파일이 더 많으면 더 늘려도 됨
 
 def extract_landmarks(landmarks, dims, idxs=None):
     result = []
