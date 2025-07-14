@@ -23,7 +23,7 @@ holistic = mp_holistic.Holistic(min_detection_confidence=0.7, min_tracking_confi
 
 POSE_SKIP_INDEXES = set(range(17, 33))
 expected_len = 194      # 모델/데이터에 맞게 동일
-BUFFER_SIZE = 24        # 학습시 시계열 프레임과 반드시 동일!
+BUFFER_SIZE = 35        # 학습시 시계열 프레임과 반드시 동일!
 CONFIDENCE_THRESHOLD = 0.5
 
 cap = cv2.VideoCapture(0)
