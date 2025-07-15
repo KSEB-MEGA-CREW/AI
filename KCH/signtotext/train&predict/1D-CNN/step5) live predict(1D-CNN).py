@@ -110,6 +110,8 @@ while cap.isOpened():
                     output_sentence.append(predicted_label)
                     if len(output_sentence) > 10:
                         output_sentence = output_sentence[-10:]
+                # 🔥 콘솔에 print 출력 (여기 추가!)
+                print(f"[RUN] 예측: {predicted_label}, 정확도: {confidence:.2f}, 누적 문장: {' '.join(output_sentence)}")
         else:
             stable_label = None
             stable_count = 0
