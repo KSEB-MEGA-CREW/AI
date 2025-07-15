@@ -1,6 +1,13 @@
 import os
 import json
 from moviepy.video.io.VideoFileClip import VideoFileClip
+import re
+
+
+# "등수:2등"과 같이 파일명으로 쓸 수 없는 기호를 바꿔주는 코드
+def sanitize_filename(name):
+    """파일명에 쓸 수 없는 문자들을 _로 치환합니다."""
+    return re.sub(r'[:\/\\?*<>|"]', '_', str(name))
 
 base_dir = os.path.dirname(os.path.abspath(__file__))
 strong_dir = os.path.join(base_dir, "strong")
@@ -34,7 +41,7 @@ for json_file in json_files:
     for clip_info in data['sign_script'].get('sign_gestures_strong', []):
         start = clip_info['start']
         end = clip_info['end']
-        gloss_id = clip_info['gloss_id']
+        gloss_id = sanitize_filename(clip_info['gloss_id'])
 
         out_name = f"{file_prefix}_{gloss_id}.mp4"
         out_path = os.path.join(strong_case_dir, out_name)
@@ -50,7 +57,7 @@ for json_file in json_files:
     for clip_info in data['sign_script'].get('sign_gestures_weak', []):
         start = clip_info['start']
         end = clip_info['end']
-        gloss_id = clip_info['gloss_id']
+        gloss_id = sanitize_filename(clip_info['gloss_id'])
 
         out_name = f"{file_prefix}_{gloss_id}.mp4"
         out_path = os.path.join(weak_case_dir, out_name)

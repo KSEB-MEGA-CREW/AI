@@ -5,23 +5,22 @@ import json
 import os
 import re
 
-# 🔸 파일명 안전하게 만들기
+# "등수:2등"과 같이 파일명으로 쓸 수 없는 기호를 _로 치환
 def sanitize_filename(name):
     return re.sub(r'[:\/\\?*<>|"]', '_', name)
 
 # 🔸 설정
-folder = "2024_LI_DC_0779230-0789690_1035"  # 원본 폴더 경로
-output_dir = "등수"                          # npy 저장 경로
+folder = "2024_LI_DC_0779230-0789690_1035"
+output_dir = "등수"
 os.makedirs(output_dir, exist_ok=True)
 
 POSE_INDEXES = list(range(17))              # ✅ 포즈: 0~16번만 사용
-expected_len = 21*3 + 21*3 + 17*4            # Left Hand + Right Hand + Pose(0~16) = 194
+expected_len = 21*3 + 21*3 + 17*4            # = 194
 
 # 🔸 파일ID 설정
-start_num = 240779260                        # VXPAKOKS 뒤 번호
-file_count = 1                               # 처리할 파일 수 (1개 처리 시 = 1)
+start_num = 240779260
+file_count = 1
 
-# 🔸 keypoint 추출 함수
 def extract_landmarks(landmarks, dims, idxs=None):
     result = []
     if landmarks:
@@ -36,7 +35,7 @@ def extract_landmarks(landmarks, dims, idxs=None):
             result.extend(coords)
     return result
 
-# 🔸 본격 처리 루프
+# 🔸 본격 처리
 for i in range(file_count):
     base_id = f"VXPAKOKS{start_num + 10*i}"
     for cam, cam_label in zip(['', 'L', 'R'], ['C', 'L', 'R']):
@@ -48,13 +47,11 @@ for i in range(file_count):
 
         print(f"▶ 처리중: {base_id}{cam} ({cam_label})")
 
-        # 🔸 JSON 파싱
         with open(json_file, "r", encoding="utf-8") as f:
             data = json.load(f)
         fps = data["potogrf"]["fps"]
         sign_gestures = data["sign_script"]["sign_gestures_strong"]
 
-        # 🔸 비디오 프레임 단위로 keypoints 추출
         cap = cv2.VideoCapture(video_file)
         all_keypoints = []
         mp_holistic = mp.solutions.holistic
@@ -69,7 +66,7 @@ for i in range(file_count):
 
                 lh = extract_landmarks(results.left_hand_landmarks, 3)
                 rh = extract_landmarks(results.right_hand_landmarks, 3)
-                pose = extract_landmarks(results.pose_landmarks, 4, idxs=POSE_INDEXES)  # ✅ 0~16번 포즈만
+                pose = extract_landmarks(results.pose_landmarks, 4, idxs=POSE_INDEXES)
 
                 keypoints = lh + rh + pose
                 if len(keypoints) < expected_len:
@@ -79,14 +76,16 @@ for i in range(file_count):
                 all_keypoints.append(keypoints)
 
         cap.release()
-        all_keypoints = np.array(all_keypoints)  # (frames, 194)
+        all_keypoints = np.array(all_keypoints)
 
-        # 🔸 gloss별 잘라서 npy 저장
         for gloss in sign_gestures:
             start_sec = gloss['start']
             end_sec = gloss['end']
             gloss_id = gloss['gloss_id']
-            gloss_id_clean = sanitize_filename(str(gloss_id).replace('.npy', '').replace('.NPY', ''))
+
+            # 확장자 제거 + 파일명 안전하게
+            gloss_id_clean = str(gloss_id).replace('.npy', '').replace('.NPY', '')
+            gloss_id_clean = sanitize_filename(gloss_id_clean)
 
             start_frame = int(round(start_sec * fps))
             end_frame = int(round(end_sec * fps))
