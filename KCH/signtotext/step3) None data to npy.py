@@ -1,4 +1,3 @@
-# save_none_npy.py
 import cv2
 import mediapipe as mp
 import numpy as np
@@ -9,19 +8,18 @@ SAVE_DIR = "output_npy"
 os.makedirs(SAVE_DIR, exist_ok=True)
 
 LABEL = "none"
-DURATION = 5         # 수집 시간 (초)
-EXPECTED_LEN = 194   # keypoint 수
-FPS = 10             # 초당 프레임 수 (너의 학습 기준이 35프레임이라면 대략 3.5초 정도면 충분)
+DURATION = 5
+EXPECTED_LEN = 194
+FPS = 10
 FRAME_COUNT = DURATION * FPS
 
 mp_holistic = mp.solutions.holistic
-POSE_SKIP_INDEXES = set(range(17, 33))
 
-def extract_landmarks(landmarks, dims, skip=None):
+def extract_landmarks(landmarks, dims, select_indexes=None):
     result = []
     if landmarks:
         for i, lm in enumerate(landmarks.landmark):
-            if skip and i in skip:
+            if select_indexes is not None and i not in select_indexes:
                 continue
             coords = [lm.x, lm.y, lm.z]
             if dims == 4:
@@ -53,7 +51,6 @@ while cap.isOpened():
     elif key == ord('s'):
         print("▶ 5초간 데이터 수집 시작...")
         sequence = []
-        start_time = time.time()
 
         while len(sequence) < FRAME_COUNT:
             ret, frame = cap.read()
@@ -62,7 +59,8 @@ while cap.isOpened():
 
             lh = extract_landmarks(results.left_hand_landmarks, 3)
             rh = extract_landmarks(results.right_hand_landmarks, 3)
-            pose = extract_landmarks(results.pose_landmarks, 4, skip=POSE_SKIP_INDEXES)
+            pose = extract_landmarks(results.pose_landmarks, 4, select_indexes=set(range(17)))  # 0~16번만 사용
+
             keypoints = lh + rh + pose
 
             if len(keypoints) < EXPECTED_LEN:
@@ -72,7 +70,6 @@ while cap.isOpened():
 
             sequence.append(keypoints)
 
-            # 진행 표시
             cv2.putText(frame, f"Collecting frame {len(sequence)}/{FRAME_COUNT}", (10, 60),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 180, 0), 2)
             cv2.imshow("수어 (None) 수집", frame)
