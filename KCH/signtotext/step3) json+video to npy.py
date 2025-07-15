@@ -3,6 +3,13 @@ import mediapipe as mp
 import numpy as np
 import json
 import os
+import re
+
+# "등수:2등"과 같이 파일명으로 쓸 수 없는 기호를 바꿔주는 코드
+def sanitize_filename(name):
+    """파일명에 쓸 수 없는 문자들을 _로 치환합니다."""
+    return re.sub(r'[:\/\\?*<>|"]', '_', name)
+
 
 # ① 설정
 folder = "2024_LI_DC_0779230-0789690_1035"
@@ -75,6 +82,7 @@ for i in range(file_count):
             gloss_id = gloss['gloss_id']
             # 혹시라도 .npy 확장자가 있으면 제거
             gloss_id_clean = str(gloss_id).replace('.npy', '').replace('.NPY', '')
+            gloss_id_clean = sanitize_filename(gloss_id_clean)
 
             start_frame = int(round(start_sec * fps))
             end_frame = int(round(end_sec * fps))
