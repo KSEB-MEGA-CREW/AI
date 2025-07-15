@@ -15,7 +15,10 @@ import matplotlib.pyplot as plt
 matplotlib.rcParams['font.family'] = 'Malgun Gothic'
 matplotlib.rcParams['axes.unicode_minus'] = False
 
-DATA_PATH = "output_npy"
+# 경로 설정 (절대경로)
+DATA_PATH = r"C:\SoftwareEdu2025\project\Hand_Sound\KCH\signtotext\output_npy"
+print("현재 데이터 폴더:", DATA_PATH)
+print("폴더 내 파일:", os.listdir(DATA_PATH))
 required_frames = 35
 expected_len = 194
 SAMPLE_COUNT = 306    # 각 라벨당 108개만 사용

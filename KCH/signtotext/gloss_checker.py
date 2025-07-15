@@ -3,7 +3,8 @@ import json
 from collections import Counter
 
 # ① 폴더 경로 지정 (절대경로 사용!)
-folder = r"C:\KEB_bootcamp\project\AI/KCH/signtotext/NIKL_Sign Language Parallel Corpus_2024_LI_CO"
+folder = r"C:\SoftwareEdu2025\project\Hand_Sound/KCH/signtotext/2024_LI_DC_0779230-0789690_1035"
+# "C:\KEB_bootcamp\project\AI/KCH/signtotext/NIKL_Sign Language Parallel Corpus_2024_LI_CO"
 gloss_counter = Counter()
 
 # ② 모든 하위폴더 포함 json파일 탐색
