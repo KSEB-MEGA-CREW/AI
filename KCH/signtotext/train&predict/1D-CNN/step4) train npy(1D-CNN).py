@@ -17,33 +17,35 @@ matplotlib.rcParams['axes.unicode_minus'] = False
 
 # 경로 설정 (절대경로)
 DATA_PATH = r"C:\SoftwareEdu2025\project\Hand_Sound\KCH\signtotext\output_npy"
-print("현재 데이터 폴더:", DATA_PATH)
-print("폴더 내 파일:", os.listdir(DATA_PATH))
 required_frames = 35
 expected_len = 194
-SAMPLE_COUNT = 306    # 각 라벨당 108개만 사용
 random.seed(42)
 
-# 1. 라벨별 파일 분류
+# 1. [정면 데이터]만 라벨별로 분류
 label_files = defaultdict(list)
 for fname in os.listdir(DATA_PATH):
-    if fname.endswith(".npy"):
+    # ▶ '정면' 데이터: 언더바 1개만 있는 파일만 사용
+    if fname.endswith(".npy") and fname.count("_") == 1:
         label = fname.split("_")[1].split('.')[0]
         label_files[label].append(fname)
 
-# 2. 108개 이상인 라벨만 사용
-selected_labels = [label for label, files in label_files.items() if len(files) >= SAMPLE_COUNT]
-print(f"{SAMPLE_COUNT}개 이상 라벨({len(selected_labels)}개):", selected_labels)
+# 2. 데이터 개수 많은 라벨 Top-5 추출
+sorted_labels = sorted(label_files.items(), key=lambda x: len(x[1]), reverse=True)
+selected_labels = [label for label, files in sorted_labels[:5]]
+print(f"선택된 라벨(Top-5): {selected_labels}")
 
-# 3. 각 라벨당 108개 랜덤 추출
+# 3. 각 라벨별 파일 개수 확인 & 최소 샘플 수 산출
+min_count = min(len(label_files[label]) for label in selected_labels)
+print(f"선택된 라벨별 파일 수: {[len(label_files[label]) for label in selected_labels]}")
+print(f"모든 라벨에서 사용될 샘플 수(최소값): {min_count}")
+
+# 4. 최소 샘플 수만큼 랜덤 추출해 데이터셋 구성
 sequences, labels = [], []
-label_dict, label_idx = {}, 0
+label_dict = {label: i for i, label in enumerate(selected_labels)}
+
 for label in selected_labels:
     files = label_files[label]
-    chosen_files = random.sample(files, SAMPLE_COUNT)
-    if label not in label_dict:
-        label_dict[label] = label_idx
-        label_idx += 1
+    chosen_files = random.sample(files, min_count)
     label_num = label_dict[label]
     for file in chosen_files:
         path = os.path.join(DATA_PATH, file)
@@ -65,12 +67,12 @@ X = np.array(sequences)
 y = to_categorical(labels)
 print(f"최종 데이터 shape: X={X.shape}, y={y.shape}, 라벨={len(label_dict)}개")
 
-# 4. 학습/검증 분리
+# 5. 학습/검증 분리
 X_train, X_test, y_train, y_test = train_test_split(
     X, y, test_size=0.3, random_state=42
 )
 
-# 5. 1D-CNN (무거운 구조)
+# 6. 1D-CNN (무거운 구조)
 model = Sequential([
     Conv1D(128, 7, activation='relu', padding='same', input_shape=(X.shape[1], X.shape[2])),
     BatchNormalization(),
@@ -93,7 +95,7 @@ model = Sequential([
 ])
 model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
 
-# 6. 학습
+# 7. 학습
 early_stop = EarlyStopping(monitor='val_loss', patience=8, restore_best_weights=True)
 reduce_lr = ReduceLROnPlateau(monitor='val_loss', factor=0.5, patience=4, min_lr=1e-5, verbose=1)
 history = model.fit(
@@ -105,14 +107,14 @@ history = model.fit(
     verbose=1
 )
 
-# 7. 저장
+# 8. 저장
 os.makedirs("models", exist_ok=True)
 model.save("models/gesture_model.h5")
-sorted_labels = [label for label, idx in sorted(label_dict.items(), key=lambda x: x[1])]
+label_list = [label for label, idx in sorted(label_dict.items(), key=lambda x: x[1])]
 with open("models/label_map.json", "w", encoding="utf-8") as f:
-    json.dump(sorted_labels, f, ensure_ascii=False)
+    json.dump(label_list, f, ensure_ascii=False)
 
-# 8. 시각화
+# 9. 시각화
 plt.figure(figsize=(12, 5))
 plt.subplot(1, 2, 1)
 plt.plot(history.history['accuracy'], label='훈련 정확도', marker='o')
