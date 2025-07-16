@@ -4,7 +4,7 @@ import numpy as np
 import os
 import time
 
-SAVE_DIR = "output_npy"
+SAVE_DIR = "None"
 os.makedirs(SAVE_DIR, exist_ok=True)
 
 LABEL = "none"
