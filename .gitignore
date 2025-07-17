@@ -38,6 +38,7 @@ saved_model/
 *.npy
 *.csv
 *.json
+*.jsonl
 
 # 데이터셋
 dataset/

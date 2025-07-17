@@ -50,8 +50,11 @@ import json
 import glob
 import os
 
+# Set the path correctly regardless of where it is executed.
 # 실행 위치에 관계없이 경로를 올바르게 설정합니다.
+# Generate absolute paths based on the location of the script file.
 # 스크립트 파일의 위치를 기준으로 절대 경로를 생성합니다.
+# Add exception handling for environments where __file__ is undefined (e.g. Jupyter notebooks).
 # __file__이 정의되지 않은 환경(예: Jupyter 노트북)을 위해 예외 처리를 추가합니다.
 try:
     script_dir = os.path.dirname(os.path.abspath(__file__))
@@ -59,14 +62,15 @@ except NameError:
     script_dir = os.getcwd()
 
 root_folder = os.path.abspath(os.path.join(script_dir, '..', 'KSEB_json_data'))
-# 출력 파일 경로를 .jsonl로 변경합니다.
+# Output file path
 output_path = os.path.join(script_dir, 'processed_data.jsonl')
-
 
 # Utilizes an OS library to recursively find .json files in a specified folder and all subfolders.
 file_pattern = os.path.join(root_folder, '**', '*.json')
 json_files = glob.glob(file_pattern, recursive=True)
 
+print(file_pattern)
+print(json_files)
 
 # Exclude the output file from being included in the processing target list.
 # os.path.abspath를 사용하여 절대 경로를 비교합니다.
@@ -75,6 +79,7 @@ json_files_to_process = [f for f in json_files if os.path.abspath(f) != output_a
 
 files_processed_count = 0
 
+# Open the file in write mode, and write the extracted data from each JSON file line by line.
 # 파일을 쓰기 모드로 열고, 각 JSON 파일에서 추출한 데이터를 한 줄씩 씁니다.
 try:
     with open(output_path, 'w', encoding='utf-8') as outfile:
