@@ -22,9 +22,25 @@ EXPECTED_LEN = 194
 MIN_VALID_FRAMES = 7          # 이하는 학습 제외
 MAX_PADDING_RATIO = 0.4       # 패딩 비율 40% 초과면 학습 제외
 
+# ✅ [A] 라벨별 npy 파일 개수 맨 처음에 출력!
+label_files = defaultdict(list)
+for fname in os.listdir(DATA_PATH):
+    if fname.endswith("_C.npy"):
+        label = fname.split("_")[1]
+        label_files[label].append(fname)
+
+print("\n[라벨별 npy 파일 개수(내림차순)]")
+label_count_list = sorted(label_files.items(), key=lambda x: len(x[1]), reverse=True)
+for label, files in label_count_list:
+    print(f"{label:15s}: {len(files)}개")
+print(f"\n총 라벨 수: {len(label_files)}개")
+file_counts = [len(files) for files in label_files.values()]
+if file_counts:
+    print(f"라벨별 최소 개수: {min(file_counts)}, 최대 개수: {max(file_counts)}, 평균: {np.mean(file_counts):.1f}, 중앙값: {np.median(file_counts):.1f}")
+
 # [3] 사용자 입력
 try:
-    TOP_N = int(input("학습할 라벨 개수(예: 30): ").strip())
+    TOP_N = int(input("\n학습할 라벨 개수(예: 30): ").strip())
 except Exception:
     TOP_N = 30
 print(f"학습할 라벨 개수: {TOP_N}")
