@@ -17,8 +17,40 @@ matplotlib.rcParams['axes.unicode_minus'] = False
 
 # [2] 경로 및 하이퍼파라미터
 DATA_PATH = r"C:\SoftwareEdu2025\project\Hand_Sound\KCH\signtotext\output_npy"
-REQUIRED_FRAMES = 35      # 시퀀스 길이
-EXPECTED_LEN = 194        # 1프레임의 feature 길이
+REQUIRED_FRAMES = 35
+EXPECTED_LEN = 194
+
+# --- 증강 함수 정의 ---
+def augment_keypoints(sequence, do_scale=True, do_shift=True, do_noise=True, do_flip=True, do_temporal=True):
+    seq = sequence.copy()
+
+    # --- 1. 스케일 (확대/축소) ---
+    if do_scale and np.random.rand() < 0.8:
+        scale = np.random.uniform(1.07, 1.18)  # 기존보다 조금 더 크게
+        seq[..., :2] *= scale
+
+    # --- 2. 평행이동 (translation) ---
+    if do_shift and np.random.rand() < 0.8:
+        shift_x = np.random.uniform(-0.05, 0.05)
+        shift_y = np.random.uniform(-0.05, 0.05)
+        seq[..., 0] += shift_x  # x좌표
+        seq[..., 1] += shift_y  # y좌표
+
+    # --- 3. 노이즈 추가 (jitter) ---
+    if do_noise and np.random.rand() < 0.7:
+        seq += np.random.normal(0, 0.012, seq.shape)
+
+    # --- 4. 좌우 뒤집기 (horizontal flip) ---
+    # x좌표만 뒤집기 (0~1 구간 기준, 포즈+손 좌표가 0~1에 위치한다고 가정)
+    if do_flip and np.random.rand() < 0.5:
+        seq[..., 0] = 1.0 - seq[..., 0]
+        # 필요시 라벨명도 바꿔야 하지만 동적수어는 flip 시 큰 문제 없음
+
+    # --- 5. 시간축 증강(프레임 셔플/shift) ---
+    if do_temporal and np.random.rand() < 0.7 and seq.shape[0] > 3:
+        start = np.random.randint(0, min(3, seq.shape[0]-REQUIRED_FRAMES+1))
+        seq = np.roll(seq, start, axis=0)
+    return seq
 
 # [3] 사용자 입력
 try:
@@ -35,7 +67,7 @@ print(f"라벨별 최소 데이터 개수: {MIN_SAMPLES}")
 
 random.seed(42)
 
-# [4] 정면 파일만 라벨별 분류 (예: [임의문자열]_[라벨]_C.npy)
+# [4] 정면 파일만 라벨별 분류
 label_files = defaultdict(list)
 for fname in os.listdir(DATA_PATH):
     if fname.endswith("_C.npy"):
@@ -66,7 +98,7 @@ selected_labels = [label for label, files in sorted_labels[:TOP_N]]
 print(f"\n[최종 학습 라벨 목록 ({TOP_N}개)]")
 print(selected_labels)
 
-# [6] 데이터셋 만들기 (각 라벨별 MIN_SAMPLES 랜덤 추출)
+# [6] 데이터셋 만들기 (증강 포함)
 sequences, labels = [], []
 label_dict = {label: i for i, label in enumerate(selected_labels)}
 
@@ -83,12 +115,20 @@ for label in selected_labels:
             sequence_fixed = np.vstack([sequence, pad])
         else:
             sequence_fixed = sequence[:REQUIRED_FRAMES]
-        # 정규화 (최대 절대값 기준)
+        # 정규화
         max_abs = np.max(np.abs(sequence_fixed))
         if max_abs > 0:
             sequence_fixed = sequence_fixed / max_abs
         sequences.append(sequence_fixed)
         labels.append(label_num)
+        # --- 데이터 증강: 한 원본당 2~3개 랜덤 생성 ---
+        for _ in range(2):  # 증강 데이터 2배
+            seq_aug = augment_keypoints(sequence_fixed)
+            max_abs_aug = np.max(np.abs(seq_aug))
+            if max_abs_aug > 0:
+                seq_aug = seq_aug / max_abs_aug
+            sequences.append(seq_aug)
+            labels.append(label_num)
 
 X = np.array(sequences)
 y = to_categorical(labels)
@@ -161,6 +201,18 @@ plt.title("손실 변화")
 plt.xlabel("Epoch")
 plt.ylabel("손실")
 plt.legend()
-
 plt.tight_layout()
 plt.show()
+
+# [12] Test셋 오프라인 예측 및 정확도 체크
+print("\n[OFFLINE TEST] 모델 Test셋 예측 결과:")
+y_pred = model.predict(X_test)
+y_pred_label = np.argmax(y_pred, axis=1)
+y_true_label = np.argmax(y_test, axis=1)
+accuracy = np.mean(y_pred_label == y_true_label)
+print(f"\n[OFFLINE TEST] 모델 Test셋 정확도: {accuracy:.4f}")
+
+for i in range(min(20, len(y_true_label))):
+    gt = label_list[y_true_label[i]]
+    pred = label_list[y_pred_label[i]]
+    print(f"[{i:02d}] 실제: {gt:10s} | 예측: {pred:10s}")
