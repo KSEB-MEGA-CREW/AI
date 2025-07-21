@@ -6,16 +6,26 @@ import os
 import re
 
 def sanitize_filename(name):
+    # 파일 이름으로 사용할 수 없는 문자를 '_'로 대체
     return re.sub(r'[:\/\\?*<>|"]', '_', name)
 
-# [경로 세팅]
-folder = r"D:\NIKL_Sign Language Parallel Corpus_2024_FI_MR"
-output_dir = r"C:\KEB_bootcamp\project\AI\KCH\signtotext\output_npy\금융입출금"
+# 경로 설정
+root_folder = r"D:\NIKL_Sign Language Parallel Corpus_2024_LI_SH\2024_0939270-0970090_3053_LI_SH1"
+output_dir = r"C:\KEB_bootcamp\project\AI\KCH\signtotext\output_npy\일상생활_학교"
 os.makedirs(output_dir, exist_ok=True)
 
+# 추출할 포즈 인덱스 및 기대하는 keypoint 수
 POSE_INDEXES = list(range(17))
 expected_len = 21*3 + 21*3 + 17*4
 
+# 처리 범위 설정
+start_num = 240939270   # 시작 번호 (예시)
+stop_num = 240970090    # 종료 번호 (예시)
+step = +10
+
+mp_holistic = mp.solutions.holistic
+
+# 랜드마크 추출 함수
 def extract_landmarks(landmarks, dims, idxs=None):
     result = []
     if landmarks:
@@ -30,60 +40,49 @@ def extract_landmarks(landmarks, dims, idxs=None):
             result.extend(coords)
     return result
 
-# 1. 폴더 내 모든 json파일 탐색
-json_files = []
-for root, dirs, files in os.walk(folder):
-    for file in files:
-        if file.endswith('.json'):
-            json_files.append(os.path.join(root, file))
+# 메인 루프
+for num in range(start_num, stop_num-1, step):
+    base_id = f"VXPAKOKS{num}"
+    json_path = os.path.join(root_folder, f"{base_id}.json")
+    video_path = os.path.join(root_folder, f"{base_id}.mp4")
 
-print(f"[INFO] json 파일 개수: {len(json_files)}개")
-
-# 2. 각 json → 정면 mp4에 맞게 npy 변환
-for json_file in json_files:
-    base_id = os.path.splitext(os.path.basename(json_file))[0]
-    video_dir = os.path.dirname(json_file)
-    video_file = os.path.join(video_dir, f"{base_id}.mp4")  # 정면 카메라만
-
-    if not os.path.exists(video_file):
-        print(f"⚠️ 파일 없음: {video_file}")
+    if not (os.path.exists(json_path) and os.path.exists(video_path)):
+        print(f"  ⚠️ {base_id} 파일 없음: {json_path} 또는 {video_path}")
         continue
 
-    print(f"▶ 처리중: {base_id}")
-
-    with open(json_file, "r", encoding="utf-8") as f:
+    # JSON 읽기
+    with open(json_path, "r", encoding="utf-8") as f:
         data = json.load(f)
     fps = data.get("potogrf", {}).get("fps", 30)
     sign_gestures = data.get("sign_script", {}).get("sign_gestures_strong", [])
 
-    cap = cv2.VideoCapture(video_file)
+    # mp4 전체 프레임 처리
+    cap = cv2.VideoCapture(video_path)
     all_keypoints = []
-    mp_holistic = mp.solutions.holistic
-    with mp_holistic.Holistic(min_detection_confidence=0.7,
-                              min_tracking_confidence=0.7) as holistic:
+    with mp_holistic.Holistic(
+        min_detection_confidence=0.7, min_tracking_confidence=0.7
+    ) as holistic:
         while True:
             ret, frame = cap.read()
             if not ret:
                 break
             image_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
             results = holistic.process(image_rgb)
-
             lh = extract_landmarks(results.left_hand_landmarks, 3)
             rh = extract_landmarks(results.right_hand_landmarks, 3)
             pose = extract_landmarks(results.pose_landmarks, 4, idxs=POSE_INDEXES)
-
             keypoints = lh + rh + pose
             if len(keypoints) < expected_len:
                 keypoints += [0.0] * (expected_len - len(keypoints))
             elif len(keypoints) > expected_len:
                 keypoints = keypoints[:expected_len]
             all_keypoints.append(keypoints)
-
     cap.release()
     all_keypoints = np.array(all_keypoints)
 
+    # gloss 단위로 나눠 저장
     for gloss in sign_gestures:
-        gloss_id = str(gloss['gloss_id'])
+        gloss_id = str(gloss['gloss_id']).strip()  # ✅ 앞뒤 공백 제거
         gloss_id_clean = sanitize_filename(gloss_id.replace('.npy', '').replace('.NPY', ''))
 
         start_sec = gloss['start']
@@ -92,12 +91,12 @@ for json_file in json_files:
         end_frame = int(round(end_sec * fps))
         gloss_keypoints = all_keypoints[start_frame:end_frame+1]
 
-        label_dir = os.path.join(output_dir, gloss_id_clean)
+        # 라벨별 폴더 저장
+        label_dir = os.path.join(output_dir, gloss_id_clean)  # gloss_id_clean은 이미 strip됨
         os.makedirs(label_dir, exist_ok=True)
         out_name = f"{base_id}_{gloss_id_clean}.npy"
         out_path = os.path.join(label_dir, out_name)
 
-        # [중복 방지] 이미 있으면 저장 안 함
         if os.path.exists(out_path):
             print(f"  ⏩ 이미 존재, 건너뜀: {out_path}")
             continue
