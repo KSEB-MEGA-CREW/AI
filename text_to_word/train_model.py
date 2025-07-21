@@ -17,34 +17,21 @@ from transformers import (
     # 'DataCollatorForSeq2Seq'는 Seq2Seq 모델의 학습을 위해 배치(batch) 단위로 데이터를 동적으로 패딩(padding) 처리하는 클래스입니다.
     DataCollatorForSeq2Seq
 )
+import data_load
+import config
 
 # 스크립트의 메인 로직을 포함하는 'main' 함수를 정의합니다.
 def main():
     # 1. 기본 변수 설정
     # 사용할 사전 학습된 KoBART 모델의 이름을 Hugging Face 허브에서 가져와 설정합니다.
-    MODEL_NAME = "ehekaanldk/kobart2ksl-translation"
+    MODEL_NAME = config.MODEL_NAME
     # 학습에 사용할 데이터 파일(.jsonl)의 경로를 설정합니다.
-    DATA_PATH = "C:/Users/Hyuk/Documents/대학/부트켐프/메인 프로젝트/AI/text_to_word/processed_data.jsonl"
+    DATA_PATH = config.DATA_PATH
     # 파인튜닝된 모델과 토크나이저, 그리고 학습 로그가 저장될 디렉토리 경로를 설정합니다.
-    OUTPUT_DIR = "C:/Users/Hyuk/Documents/대학/부트켐프/메인 프로젝트/AI/text_to_word/kobart-finetuned-ksl-glosser"
-
-    # 2. 데이터셋 로드 및 전처리
-    # jsonl (JSON Lines) 파일을 한 줄씩 읽어 리스트로 반환하는 제너레이터 함수를 정의합니다.
-    def load_jsonl(file_path):
-        # 데이터를 저장할 빈 리스트를 생성합니다.
-        data = []
-        # 'with open'을 사용하여 파일을 열고, 작업이 끝나면 자동으로 파일을 닫도록 합니다.
-        # 'encoding='utf-8''은 한글이 깨지지 않도록 인코딩 방식을 지정합니다.
-        with open(file_path, 'r', encoding='utf-8') as f:
-            # 파일의 각 줄(line)에 대해 반복합니다.
-            for line in f:
-                # 'json.loads(line)'을 사용하여 JSON 문자열 한 줄을 파이썬 딕셔너리로 변환하고, 'data' 리스트에 추가합니다.
-                data.append(json.loads(line))
-        # 데이터가 모두 담긴 리스트를 반환합니다.
-        return data
+    OUTPUT_DIR = config.OUTPUT_DIR
 
     # 위에서 정의한 'load_jsonl' 함수를 호출하여 학습 데이터를 로드합니다.
-    train_data = load_jsonl(DATA_PATH)
+    train_data = data_load.load_jsonl(DATA_PATH, limit = 1000)
     
     # Hugging Face의 'Dataset' 객체로 변환하기 위해 데이터를 딕셔너리 형태로 가공합니다.
     # 'gloss_id'는 원래 리스트 형태이므로, 각 요소를 공백으로 연결하여 하나의 문자열로 변환합니다.
@@ -54,11 +41,13 @@ def main():
         # 'gloss_id' 키에 공백으로 합쳐진 수어 단어(gloss) 문자열 리스트를 할당합니다.
         "gloss_id": [" ".join(item['gloss_id']) for item in train_data]
     }
+
+    # print(processed_data)
     # 가공된 파이썬 딕셔너리를 Hugging Face의 'Dataset' 객체로 변환합니다.
     dataset = Dataset.from_dict(processed_data)
 
     # 전체 데이터셋을 훈련용(90%)과 검증용(10%)으로 분리합니다. 'test_size=0.1'은 10%를 검증용으로 사용하겠다는 의미입니다.
-    dataset = dataset.train_test_split(test_size=0.1)
+    dataset = dataset.train_test_split(test_size=0.2)
     # 분리된 데이터셋에서 훈련용 데이터셋을 'train_dataset' 변수에 할당합니다.
     train_dataset = dataset['train']
     # 분리된 데이터셋에서 검증용 데이터셋을 'eval_dataset' 변수에 할당합니다.
@@ -76,7 +65,6 @@ def main():
     # 3. 토크나이저 로드
     # 'AutoTokenizer.from_pretrained'를 사용해 'MODEL_NAME'에 해당하는 사전 학습된 모델의 토크나이저를 로드합니다.
     tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
-
     # 4. 데이터 토큰화
     # 입력 시퀀스(한국어 문장)의 최대 길이를 128 토큰으로 설정합니다. 이보다 길면 잘라냅니다.
     max_input_length = 128

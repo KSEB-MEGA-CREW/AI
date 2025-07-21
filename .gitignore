@@ -69,3 +69,6 @@ __pycache__/
 *.pid
 *.db
 *.sqlite3
+
+GEMINI.md
+kobart-custom-tokenizer/
