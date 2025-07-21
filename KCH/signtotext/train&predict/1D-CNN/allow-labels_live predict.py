@@ -11,7 +11,7 @@ with open("models/label_map.json", "r", encoding="utf-8") as f:
 label_map = {i: label for i, label in enumerate(label_list)}
 
 # 🔹 원하는 단어만 추론
-ALLOWED_LABELS = ["일하다1", "회사1", "타자1", "소개1", "지시2", "필요1"]  # ← 여기 원하는 단어만 입력! (여러 개도 가능)
+ALLOWED_LABELS = ["일하다1", "회사1", "타자1", "소개1"]  # ← 여기 원하는 단어만 입력! (여러 개도 가능)
 
 # 🔹 MediaPipe 설정
 mp_holistic = mp.solutions.holistic

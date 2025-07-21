@@ -10,6 +10,7 @@ import json
 import random
 import matplotlib
 import matplotlib.pyplot as plt
+from bayes_opt import BayesianOptimization
 
 # [1] 한글 폰트 설정 (Windows 기준)
 matplotlib.rcParams['font.family'] = 'Malgun Gothic'
@@ -19,8 +20,8 @@ matplotlib.rcParams['axes.unicode_minus'] = False
 DATA_PATH = r"C:\SoftwareEdu2025\project\Hand_Sound\KCH\signtotext\output_npy"
 REQUIRED_FRAMES = 10          # 전체 분포에 맞게 (중앙값)
 EXPECTED_LEN = 194
-MIN_VALID_FRAMES = 7          # 이하는 학습 제외
-MAX_PADDING_RATIO = 0.4       # 패딩 비율 40% 초과면 학습 제외
+MIN_VALID_FRAMES = 7
+MAX_PADDING_RATIO = 0.4
 
 # ✅ [A] 라벨별 npy 파일 개수 맨 처음에 출력!
 label_files = defaultdict(list)
@@ -126,52 +127,100 @@ X_train, X_test, y_train, y_test = train_test_split(
     X, y, test_size=0.3, random_state=42
 )
 
-# [8] 1D-CNN 모델 정의
+# [8] Bayesian Optimization 대상 함수 정의
+def cnn_train_eval(learning_rate, dropout1, dropout2):
+    from tensorflow.keras.optimizers import Adam
+    model = Sequential([
+        Conv1D(128, 7, activation='relu', padding='same', input_shape=(X.shape[1], X.shape[2])),
+        BatchNormalization(),
+        MaxPooling1D(2),
+        Dropout(dropout1),
+        Conv1D(256, 5, activation='relu', padding='same'),
+        BatchNormalization(),
+        MaxPooling1D(2),
+        Dropout(dropout2),
+        Flatten(),
+        Dense(512, activation='relu'),
+        Dropout(dropout1),
+        Dense(256, activation='relu'),
+        Dropout(dropout2),
+        Dense(y.shape[1], activation='softmax')
+    ])
+    model.compile(optimizer=Adam(learning_rate=learning_rate), loss='categorical_crossentropy', metrics=['accuracy'])
+
+    early_stop = EarlyStopping(monitor='val_loss', patience=15, restore_best_weights=True)
+    reduce_lr = ReduceLROnPlateau(monitor='val_loss', factor=0.5, patience=4, min_lr=1e-5, verbose=0)
+    history = model.fit(
+        X_train, y_train,
+        validation_data=(X_test, y_test),
+        epochs=60, # 속도 위해 epoch 제한
+        batch_size=16,
+        callbacks=[early_stop, reduce_lr],
+        verbose=0
+    )
+    score = model.evaluate(X_test, y_test, verbose=0)
+    val_acc = score[1]
+    # 최대화이므로 accuracy 반환
+    return val_acc
+
+# [9] 베이지안 최적화 범위 지정 및 실행
+pbounds = {
+    'learning_rate': (1e-4, 3e-3),      # 학습률 범위
+    'dropout1': (0.1, 0.5),             # Dropout(첫 레이어)
+    'dropout2': (0.1, 0.5)              # Dropout(두 번째 레이어)
+}
+
+bo = BayesianOptimization(
+    f=cnn_train_eval,
+    pbounds=pbounds,
+    random_state=42
+)
+
+print("\n[Bayesian Optimization] CNN 하이퍼파라미터 탐색 시작")
+bo.maximize(init_points=5, n_iter=12)  # 빠른 탐색(실전은 더 늘려도 됨)
+
+# [10] 최적 파라미터로 최종 모델 학습
+best_params = bo.max['params']
+print(f"\n[최적 파라미터] {best_params}")
+
 model = Sequential([
     Conv1D(128, 7, activation='relu', padding='same', input_shape=(X.shape[1], X.shape[2])),
     BatchNormalization(),
     MaxPooling1D(2),
-    Dropout(0.3),
-
+    Dropout(best_params['dropout1']),
     Conv1D(256, 5, activation='relu', padding='same'),
     BatchNormalization(),
     MaxPooling1D(2),
-    Dropout(0.3),
-
-    Conv1D(256, 3, activation='relu', padding='same'),
-    BatchNormalization(),
-    MaxPooling1D(2),
-    Dropout(0.3),
-
+    Dropout(best_params['dropout2']),
     Flatten(),
     Dense(512, activation='relu'),
-    Dropout(0.4),
+    Dropout(best_params['dropout1']),
     Dense(256, activation='relu'),
-    Dropout(0.3),
+    Dropout(best_params['dropout2']),
     Dense(y.shape[1], activation='softmax')
 ])
-model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
+from tensorflow.keras.optimizers import Adam
+model.compile(optimizer=Adam(learning_rate=best_params['learning_rate']), loss='categorical_crossentropy', metrics=['accuracy'])
 
-# [9] 콜백 및 학습
-early_stop = EarlyStopping(monitor='val_loss', patience=20, restore_best_weights=True)
+early_stop = EarlyStopping(monitor='val_loss', patience=30, restore_best_weights=True)
 reduce_lr = ReduceLROnPlateau(monitor='val_loss', factor=0.5, patience=4, min_lr=1e-5, verbose=1)
 history = model.fit(
     X_train, y_train,
     validation_data=(X_test, y_test),
-    epochs=100,
+    epochs=1000,
     batch_size=16,
     callbacks=[early_stop, reduce_lr],
     verbose=1
 )
 
-# [10] 모델 및 라벨맵 저장
+# [11] 모델 및 라벨맵 저장
 os.makedirs("models", exist_ok=True)
 model.save("models/gesture_model.h5")
 label_list = [label for label, idx in sorted(label_dict.items(), key=lambda x: x[1])]
 with open("models/label_map.json", "w", encoding="utf-8") as f:
     json.dump(label_list, f, ensure_ascii=False)
 
-# [11] 학습 곡선 시각화
+# [12] 학습 곡선 시각화
 plt.figure(figsize=(12, 5))
 plt.subplot(1, 2, 1)
 plt.plot(history.history['accuracy'], label='훈련 정확도', marker='o')
@@ -191,7 +240,7 @@ plt.legend()
 plt.tight_layout()
 plt.show()
 
-# [12] Test셋 오프라인 예측 및 정확도 체크
+# [13] Test셋 오프라인 예측 및 정확도 체크
 print("\n[OFFLINE TEST] 모델 Test셋 예측 결과:")
 y_pred = model.predict(X_test)
 y_pred_label = np.argmax(y_pred, axis=1)
