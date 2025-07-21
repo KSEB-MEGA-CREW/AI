@@ -2,11 +2,15 @@ import cv2
 import mediapipe as mp
 import numpy as np
 import json
+import time
 from tensorflow.keras.models import load_model
 
-# 🔹 모델 및 라벨 로딩
-model = load_model("models/gesture_model.h5")
-with open("models/label_map.json", "r", encoding="utf-8") as f:
+# 🔹 모델 및 라벨 로딩 (절대경로 사용!)
+MODEL_PATH = r"C:\SoftwareEdu2025\project\Hand_Sound\KCH\signtotext\train&predict\models\test_model\gesture_model.h5"
+LABEL_PATH = r"C:\SoftwareEdu2025\project\Hand_Sound\KCH\signtotext\train&predict\models\test_model\label_map.json"
+
+model = load_model(MODEL_PATH)
+with open(LABEL_PATH, "r", encoding="utf-8") as f:
     label_list = json.load(f)
 label_map = {i: label for i, label in enumerate(label_list)}
 
@@ -29,6 +33,9 @@ stable_count = 0
 output_sentence = []
 STABLE_THRESHOLD = 3   # 연속 3프레임 예측 시 누적
 
+last_add_time = time.time()   # 마지막 단어 추가 시각
+RESET_INTERVAL = 5.0          # 5초간 새 단어 없으면 전체 문장 초기화
+
 def extract_landmarks(landmarks, dims, skip=None):
     result = []
     if landmarks:
@@ -50,7 +57,7 @@ while cap.isOpened():
 
     image_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
     results = holistic.process(image_rgb)
-    display_frame = frame.copy()  # 화면에는 아무 텍스트도 안씀
+    display_frame = frame.copy()
 
     lh = extract_landmarks(results.left_hand_landmarks, 3)
     rh = extract_landmarks(results.right_hand_landmarks, 3)
@@ -63,10 +70,8 @@ while cap.isOpened():
     elif len(keypoints) > expected_len:
         keypoints = keypoints[:expected_len]
 
-    # 손 미인식/카메라 상태 체크
     zero_ratio = keypoints.count(0.0) / len(keypoints)
     if zero_ratio > 0.9:
-        # 예측/누적 안함, skip만
         frame_buffer = []
         stable_count = 0
         last_stable_label = None
@@ -75,7 +80,7 @@ while cap.isOpened():
             break
         continue
 
-    # 버퍼 쌓기 (10프레임)
+    # 버퍼 쌓기
     frame_buffer.append(keypoints)
     if len(frame_buffer) > BUFFER_SIZE:
         frame_buffer.pop(0)
@@ -85,7 +90,6 @@ while cap.isOpened():
 
     if len(frame_buffer) == BUFFER_SIZE:
         input_data = np.array(frame_buffer)
-        # 정규화 (학습과 동일하게)
         max_abs = np.max(np.abs(input_data))
         if max_abs > 0:
             input_data = input_data / max_abs
@@ -95,7 +99,6 @@ while cap.isOpened():
         confidence = float(np.max(prediction))
         predicted_label = label_map.get(pred_idx, "None") if confidence >= CONFIDENCE_THRESHOLD else "None"
 
-        # 같은 단어가 STABLE_THRESHOLD번 연속 예측되면 누적
         if predicted_label != "None":
             if predicted_label == last_stable_label:
                 stable_count += 1
@@ -105,6 +108,7 @@ while cap.isOpened():
             if stable_count == STABLE_THRESHOLD:
                 if len(output_sentence) == 0 or predicted_label != output_sentence[-1]:
                     output_sentence.append(predicted_label)
+                    last_add_time = time.time()  # 단어 추가 시각 갱신!
                     if len(output_sentence) > 10:
                         output_sentence = output_sentence[-10:]
                 print(f"[RUN] 예측: {predicted_label}, 정확도: {confidence:.2f}, 누적 문장: {' '.join(output_sentence)}")
@@ -112,7 +116,13 @@ while cap.isOpened():
             last_stable_label = None
             stable_count = 0
 
-    # 랜드마크 시각화 (옵션)
+    # --- [NEW] 일정 시간 경과 시 누적 문장 전체 초기화 ---
+    if len(output_sentence) > 0 and (time.time() - last_add_time > RESET_INTERVAL):
+        output_sentence = []
+        print(f"[RESET] {RESET_INTERVAL}초 경과로 누적 문장 전체 초기화")
+    # -----------------------------------------------------
+
+    # 랜드마크 시각화
     mp_drawing.draw_landmarks(display_frame, results.pose_landmarks, mp_holistic.POSE_CONNECTIONS)
     mp_drawing.draw_landmarks(display_frame, results.left_hand_landmarks, mp_holistic.HAND_CONNECTIONS)
     mp_drawing.draw_landmarks(display_frame, results.right_hand_landmarks, mp_holistic.HAND_CONNECTIONS)

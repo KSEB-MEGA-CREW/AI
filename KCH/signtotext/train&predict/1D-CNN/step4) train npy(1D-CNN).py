@@ -17,11 +17,15 @@ matplotlib.rcParams['font.family'] = 'Malgun Gothic'
 matplotlib.rcParams['axes.unicode_minus'] = False
 
 # [2] 경로 및 하이퍼파라미터
-DATA_PATH = r"C:\SoftwareEdu2025\project\Hand_Sound\KCH\signtotext\output_npy\일상대화"
+DATA_PATH = r"C:\SoftwareEdu2025\project\Hand_Sound\KCH\signtotext\output_npy\test"
 REQUIRED_FRAMES = 10
 EXPECTED_LEN = 194
 MIN_VALID_FRAMES = 7
 MAX_PADDING_RATIO = 0.4
+
+# ⭐️ 저장할 폴더명 직접 지정(여기만 바꾸면 됨)
+SAVE_DIR = r"C:\SoftwareEdu2025\project\Hand_Sound\KCH\signtotext\train&predict\models\test_model"
+os.makedirs(SAVE_DIR, exist_ok=True)
 
 # ✅ [A] os.walk로 라벨별 npy 파일 딕셔너리(하위 폴더까지 전부!)
 label_files = defaultdict(list)
@@ -157,14 +161,13 @@ def cnn_train_eval(learning_rate, dropout1, dropout2):
     )
     score = model.evaluate(X_test, y_test, verbose=0)
     val_acc = score[1]
-    # 최대화이므로 accuracy 반환
     return val_acc
 
 # [9] 베이지안 최적화 범위 지정 및 실행
 pbounds = {
-    'learning_rate': (1e-4, 3e-3),      # 학습률 범위
-    'dropout1': (0.1, 0.5),             # Dropout(첫 레이어)
-    'dropout2': (0.1, 0.5)              # Dropout(두 번째 레이어)
+    'learning_rate': (1e-4, 3e-3),
+    'dropout1': (0.1, 0.5),
+    'dropout2': (0.1, 0.5)
 }
 
 bo = BayesianOptimization(
@@ -174,7 +177,7 @@ bo = BayesianOptimization(
 )
 
 print("\n[Bayesian Optimization] CNN 하이퍼파라미터 탐색 시작")
-bo.maximize(init_points=5, n_iter=12)  # 빠른 탐색(실전은 더 늘려도 됨)
+bo.maximize(init_points=5, n_iter=12)
 
 # [10] 최적 파라미터로 최종 모델 학습
 best_params = bo.max['params']
@@ -210,11 +213,10 @@ history = model.fit(
     verbose=1
 )
 
-# [11] 모델 및 라벨맵 저장
-os.makedirs("models", exist_ok=True)
-model.save("models/gesture_model.h5")
+# [11] 모델 및 라벨맵 저장 (⭐️ 원하는 폴더에 저장)
+model.save(os.path.join(SAVE_DIR, "gesture_model.h5"))
 label_list = [label for label, idx in sorted(label_dict.items(), key=lambda x: x[1])]
-with open("models/label_map.json", "w", encoding="utf-8") as f:
+with open(os.path.join(SAVE_DIR, "label_map.json"), "w", encoding="utf-8") as f:
     json.dump(label_list, f, ensure_ascii=False)
 
 # [12] 학습 곡선 시각화
