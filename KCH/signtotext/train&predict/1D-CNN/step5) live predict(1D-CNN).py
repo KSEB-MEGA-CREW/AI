@@ -6,8 +6,8 @@ import time
 from tensorflow.keras.models import load_model
 
 # 🔹 모델 및 라벨 로딩 (절대경로 사용!)
-MODEL_PATH = r"C:\SoftwareEdu2025\project\Hand_Sound\KCH\signtotext\train&predict\models\test_model\gesture_model.h5"
-LABEL_PATH = r"C:\SoftwareEdu2025\project\Hand_Sound\KCH\signtotext\train&predict\models\test_model\label_map.json"
+MODEL_PATH = r"C:\SoftwareEdu2025\project\Hand_Sound\KCH\signtotext\train&predict\models\testnone_model_model\gesture_model.h5"
+LABEL_PATH = r"C:\SoftwareEdu2025\project\Hand_Sound\KCH\signtotext\train&predict\models\testnone_model_model\label_map.json"
 
 model = load_model(MODEL_PATH)
 with open(LABEL_PATH, "r", encoding="utf-8") as f:

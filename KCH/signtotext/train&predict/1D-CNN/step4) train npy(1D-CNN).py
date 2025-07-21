@@ -24,7 +24,7 @@ MIN_VALID_FRAMES = 7
 MAX_PADDING_RATIO = 0.4
 
 # ⭐️ 저장할 폴더명 직접 지정(여기만 바꾸면 됨)
-SAVE_DIR = r"C:\SoftwareEdu2025\project\Hand_Sound\KCH\signtotext\train&predict\models\test_model"
+SAVE_DIR = r"C:\SoftwareEdu2025\project\Hand_Sound\KCH\signtotext\train&predict\models\testnone_model_model"
 os.makedirs(SAVE_DIR, exist_ok=True)
 
 # ✅ [A] os.walk로 라벨별 npy 파일 딕셔너리(하위 폴더까지 전부!)
@@ -193,12 +193,11 @@ model = Sequential([
     MaxPooling1D(2),
     Dropout(best_params['dropout2']),
     Flatten(),
-    Dense(512, activation='relu'),
-    Dropout(best_params['dropout1']),
     Dense(256, activation='relu'),
-    Dropout(best_params['dropout2']),
+    Dropout(best_params['dropout1']),
     Dense(y.shape[1], activation='softmax')
 ])
+
 from tensorflow.keras.optimizers import Adam
 model.compile(optimizer=Adam(learning_rate=best_params['learning_rate']), loss='categorical_crossentropy', metrics=['accuracy'])
 

@@ -46,12 +46,22 @@ while True:
     if key == ord('s'):
         print("수집 시작...")
         buffer = []
-        while len(buffer) < SEQ_LEN:
+        collect_count = 0
+        while collect_count < SEQ_LEN:
             ret, frame = cap.read()
             if not ret:
                 continue
             image_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
             results = holistic.process(image_rgb)
+
+            # ① 손/포즈 인식 여부 확인
+            if (
+                results.left_hand_landmarks is None and
+                results.right_hand_landmarks is None and
+                results.pose_landmarks is None
+            ):
+                print("[SKIP] 손/포즈 인식 안 됨. 이 프레임은 None 데이터로 저장 X")
+                continue  # skip
 
             lh = extract_landmarks(results.left_hand_landmarks, 3)
             rh = extract_landmarks(results.right_hand_landmarks, 3)
@@ -65,7 +75,10 @@ while True:
                 keypoints = keypoints[:expected_len]
 
             buffer.append(keypoints)
-            cv2.putText(frame, f"Collecting None ({len(buffer)}/{SEQ_LEN})", (10, 30),
+            collect_count += 1
+
+            # 진행 상황 표시
+            cv2.putText(frame, f"Collecting None ({collect_count}/{SEQ_LEN})", (10, 30),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 200, 255), 2)
             cv2.imshow("None Data Collection", frame)
             if cv2.waitKey(1) & 0xFF == ord('q'):
@@ -74,7 +87,7 @@ while True:
         # npy 파일 저장
         buffer_np = np.array(buffer)
         now = datetime.now().strftime("%Y%m%d_%H%M%S")
-        fname = f"none_{now}_C.npy"
+        fname = f"none_{now}.npy"
         np.save(os.path.join(SAVE_DIR, fname), buffer_np)
         print(f"[SAVE] None 데이터 저장: {fname}  shape={buffer_np.shape}")
 
