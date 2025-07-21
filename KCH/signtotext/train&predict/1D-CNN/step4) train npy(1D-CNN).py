@@ -17,7 +17,7 @@ matplotlib.rcParams['font.family'] = 'Malgun Gothic'
 matplotlib.rcParams['axes.unicode_minus'] = False
 
 # [2] 경로 및 하이퍼파라미터
-DATA_PATH = r"C:\SoftwareEdu2025\project\Hand_Sound\KCH\signtotext\output_npy"
+DATA_PATH = r"C:\SoftwareEdu2025\project\Hand_Sound\KCH\signtotext\output_npy\일상대화"
 REQUIRED_FRAMES = 10          # 전체 분포에 맞게 (중앙값)
 EXPECTED_LEN = 194
 MIN_VALID_FRAMES = 7
