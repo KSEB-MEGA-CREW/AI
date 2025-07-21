@@ -18,23 +18,35 @@ matplotlib.rcParams['axes.unicode_minus'] = False
 
 # [2] 경로 및 하이퍼파라미터
 DATA_PATH = r"C:\SoftwareEdu2025\project\Hand_Sound\KCH\signtotext\output_npy\일상대화"
-REQUIRED_FRAMES = 10          # 전체 분포에 맞게 (중앙값)
+REQUIRED_FRAMES = 10
 EXPECTED_LEN = 194
 MIN_VALID_FRAMES = 7
 MAX_PADDING_RATIO = 0.4
 
-# ✅ [A] 라벨별 npy 파일 개수 맨 처음에 출력!
+# ✅ [A] os.walk로 라벨별 npy 파일 딕셔너리(하위 폴더까지 전부!)
 label_files = defaultdict(list)
-for fname in os.listdir(DATA_PATH):
-    if fname.endswith("_C.npy"):
-        label = fname.split("_")[1]
-        label_files[label].append(fname)
+for root, dirs, files in os.walk(DATA_PATH):
+    for fname in files:
+        if fname.endswith(".npy"):
+            try:
+                name_split = fname.split("_")
+                if len(name_split) >= 2:
+                    label_part = name_split[1]
+                    label = label_part.split(".")[0]
+                    label_files[label].append(os.path.join(root, fname))
+                else:
+                    print(f"❌ 파일명 파싱 오류: {fname}")
+            except Exception as e:
+                print(f"❌ 파일명 파싱 오류: {fname} ({e})")
 
-print("\n[라벨별 npy 파일 개수(내림차순)]")
+# (1) 내림차순 정렬 + 번호 출력
 label_count_list = sorted(label_files.items(), key=lambda x: len(x[1]), reverse=True)
-for label, files in label_count_list:
-    print(f"{label:15s}: {len(files)}개")
+print("\n라벨별 npy 개수 (개수 많은 순, 번호순):")
+for i, (label, files) in enumerate(label_count_list, 1):
+    print(f"{i:3d}. {label:15s}: {len(files)}개")
 print(f"\n총 라벨 수: {len(label_files)}개")
+print(f"총 npy 파일 수: {sum(len(files) for _, files in label_count_list)}개")
+
 file_counts = [len(files) for files in label_files.values()]
 if file_counts:
     print(f"라벨별 최소 개수: {min(file_counts)}, 최대 개수: {max(file_counts)}, 평균: {np.mean(file_counts):.1f}, 중앙값: {np.median(file_counts):.1f}")
@@ -54,29 +66,15 @@ print(f"라벨별 최소 데이터 개수: {MIN_SAMPLES}")
 
 random.seed(42)
 
-# [4] 정면 파일만 라벨별 분류 (예: [임의문자열]_[라벨]_C.npy)
-label_files = defaultdict(list)
-for fname in os.listdir(DATA_PATH):
-    if fname.endswith("_C.npy"):
-        label = fname.split("_")[1]
-        label_files[label].append(fname)
-
-print("\n[라벨별 npy 파일 개수(내림차순)]")
-label_count_list = sorted(label_files.items(), key=lambda x: len(x[1]), reverse=True)
-for label, files in label_count_list:
-    print(f"{label:15s}: {len(files)}개")
-print(f"\n총 라벨 수: {len(label_files)}개")
-
-# [5] 라벨 필터링 (MIN_SAMPLES 이상만)
+# [4] 라벨 필터링 (MIN_SAMPLES 이상)
 eligible_labels = [label for label, files in label_files.items() if len(files) >= MIN_SAMPLES]
 print(f"\n[{MIN_SAMPLES}개 이상 npy 가진 라벨 수]: {len(eligible_labels)}개")
 
-sorted_labels = sorted([(label, label_files[label]) for label in eligible_labels],
-                      key=lambda x: len(x[1]), reverse=True)
-
+# [5] 개수 많은 순으로 TOP-N 라벨 선정
+sorted_labels = sorted([(label, label_files[label]) for label in eligible_labels], key=lambda x: len(x[1]), reverse=True)
 print(f"\n[조건 만족 라벨 TOP-{TOP_N} 미리보기]")
-for label, files in sorted_labels[:TOP_N]:
-    print(f"{label:15s}: {len(files)}개")
+for i, (label, files) in enumerate(sorted_labels[:TOP_N], 1):
+    print(f"{i:3d}. {label:15s}: {len(files)}개")
 
 if len(eligible_labels) < TOP_N:
     raise ValueError(f"\nMIN_SAMPLES={MIN_SAMPLES} 기준을 만족하는 라벨이 {len(eligible_labels)}개뿐입니다. 값을 조정하세요.")
@@ -94,10 +92,9 @@ for label in selected_labels:
     chosen_files = random.sample(files, MIN_SAMPLES)
     label_num = label_dict[label]
     for file in chosen_files:
-        path = os.path.join(DATA_PATH, file)
-        sequence = np.load(path)
+        sequence = np.load(file)  # 이미 풀경로임!
         if sequence.shape[0] < MIN_VALID_FRAMES:
-            continue  # 너무 짧은 데이터 제외
+            continue
 
         # 프레임 수 맞춤 (패딩/자르기)
         if sequence.shape[0] < REQUIRED_FRAMES:
