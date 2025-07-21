@@ -2,11 +2,11 @@ import os
 import numpy as np
 from collections import Counter
 
-DATA_PATH = r"C:\SoftwareEdu2025\project\Hand_Sound\KCH\signtotext\output_npy"
+DATA_PATH = r"C:\SoftwareEdu2025\project\Hand_Sound\KCH\signtotext\output_npy\test"
 frame_lengths = []
 
 for fname in os.listdir(DATA_PATH):
-    if fname.endswith("_C.npy"):
+    if fname.endswith(".npy"):
         arr = np.load(os.path.join(DATA_PATH, fname))
         frame_lengths.append(arr.shape[0])
 
