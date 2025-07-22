@@ -2,36 +2,38 @@ import cv2
 import mediapipe as mp
 import numpy as np
 import json
+import time
 from tensorflow.keras.models import load_model
-from PIL import ImageFont, ImageDraw, Image
 
-# 🔹 모델 및 라벨 로딩
-model = load_model("models/gesture_model.h5")
-with open("models/label_map.json", "r", encoding="utf-8") as f:
+# 🔹 모델 및 라벨 로딩 (절대경로 사용!)
+MODEL_PATH = r"C:\SoftwareEdu2025\project\Hand_Sound\KCH\signtotext\train&predict\models\test_model(4)\gesture_model.h5"
+LABEL_PATH = r"C:\SoftwareEdu2025\project\Hand_Sound\KCH\signtotext\train&predict\models\test_model(4)\label_map.json"
+
+model = load_model(MODEL_PATH)
+with open(LABEL_PATH, "r", encoding="utf-8") as f:
     label_list = json.load(f)
 label_map = {i: label for i, label in enumerate(label_list)}
 
-# 🔹 한글 폰트 설정 (윈도우 기준)
-FONT_PATH = "C:/Windows/Fonts/malgun.ttf"
-FONT = ImageFont.truetype(FONT_PATH, 28)
-FONT_SMALL = ImageFont.truetype(FONT_PATH, 22)
-
-# 🔹 MediaPipe 설정
 mp_holistic = mp.solutions.holistic
 mp_drawing = mp.solutions.drawing_utils
-holistic = mp_holistic.Holistic(min_detection_confidence=0.7, min_tracking_confidence=0.7)
+holistic = mp_holistic.Holistic(
+    min_detection_confidence=0.7, min_tracking_confidence=0.7
+)
 
 POSE_SKIP_INDEXES = set(range(17, 33))
-expected_len = 194      # 모델/데이터에 맞게 동일
-BUFFER_SIZE = 35        # 학습시 시계열 프레임과 반드시 동일!
-CONFIDENCE_THRESHOLD = 0.5
+expected_len = 194
+BUFFER_SIZE = 10
+CONFIDENCE_THRESHOLD = 0.7   # <-- 정확도 기준 높임!
 
 cap = cv2.VideoCapture(0)
 frame_buffer = []
-output_sentence = []
-stable_label = None
+last_stable_label = None
 stable_count = 0
-STABLE_THRESHOLD = 5   # 연속 5프레임 예측 시 누적
+output_sentence = []
+STABLE_THRESHOLD = 3
+
+last_add_time = time.time()
+RESET_INTERVAL = 5.0
 
 def extract_landmarks(landmarks, dims, skip=None):
     result = []
@@ -45,16 +47,7 @@ def extract_landmarks(landmarks, dims, skip=None):
             result.extend(coords)
     return result
 
-def draw_korean_text(frame, text, position=(10, 30), font=FONT, color=(0, 255, 0)):
-    img_pil = Image.fromarray(frame)
-    draw = ImageDraw.Draw(img_pil)
-    draw.text(position, text, font=font, fill=color)
-    return np.array(img_pil)
-
-print("🔁 실시간 수어 예측 시작 (Q: 종료)")
-
-predicted_label = ""
-confidence = 0.0
+print("🔁 실시간 수어 예측 시작 (q: 종료)")
 
 while cap.isOpened():
     ret, frame = cap.read()
@@ -77,56 +70,57 @@ while cap.isOpened():
 
     zero_ratio = keypoints.count(0.0) / len(keypoints)
     if zero_ratio > 0.9:
-        display_frame = draw_korean_text(display_frame, "손 인식 불가 (입력 무의미)", (10, 30), font=FONT, color=(0, 0, 255))
+        frame_buffer = []
+        stable_count = 0
+        last_stable_label = None
         cv2.imshow("실시간 수어 예측", display_frame)
         if cv2.waitKey(1) & 0xFF == ord('q'):
             break
         continue
 
-    # 학습과 동일하게 정규화 없이 raw값 사용
     frame_buffer.append(keypoints)
     if len(frame_buffer) > BUFFER_SIZE:
         frame_buffer.pop(0)
 
-    # 버퍼가 가득 찼을 때만 예측
     predicted_label = None
     confidence = 0.0
+
     if len(frame_buffer) == BUFFER_SIZE:
-        input_data = np.expand_dims(np.array(frame_buffer), axis=0)
+        input_data = np.array(frame_buffer)
+        max_abs = np.max(np.abs(input_data))
+        if max_abs > 0:
+            input_data = input_data / max_abs
+        input_data = np.expand_dims(input_data, axis=0)
         prediction = model.predict(input_data, verbose=0)
         pred_idx = int(np.argmax(prediction))
         confidence = float(np.max(prediction))
-        predicted_label = label_map.get(pred_idx, "None") if confidence >= CONFIDENCE_THRESHOLD else "None"
+        predicted_label = label_map.get(pred_idx, "none") if confidence >= CONFIDENCE_THRESHOLD else "none"
 
-        # 연속 안정화
-        if predicted_label != "None":
-            if stable_label == predicted_label:
+        # [수정] 'none'은 누적문장에 추가 X, print만 따로!
+        if predicted_label != "none":
+            if predicted_label == last_stable_label:
                 stable_count += 1
             else:
-                stable_label = predicted_label
+                last_stable_label = predicted_label
                 stable_count = 1
             if stable_count == STABLE_THRESHOLD:
                 if len(output_sentence) == 0 or predicted_label != output_sentence[-1]:
                     output_sentence.append(predicted_label)
+                    last_add_time = time.time()
                     if len(output_sentence) > 10:
                         output_sentence = output_sentence[-10:]
-                # 🔥 콘솔에 print 출력 (여기 추가!)
                 print(f"[RUN] 예측: {predicted_label}, 정확도: {confidence:.2f}, 누적 문장: {' '.join(output_sentence)}")
         else:
-            stable_label = None
+            # none 예측시 print (누적문장 추가X)
+            print(f"[NONE] 예측: none, 정확도: {confidence:.2f}")
+
+            last_stable_label = None
             stable_count = 0
 
-    # 🔹 출력 조건
-    if predicted_label not in [None, "None"]:
-        label_text = f"예측: {predicted_label}"
-        sub_text = f"(정확도: {confidence:.2f})"
-        display_frame = draw_korean_text(display_frame, label_text, (10, 30), font=FONT, color=(0, 255, 0))
-        display_frame = draw_korean_text(display_frame, sub_text, (10, 65), font=FONT_SMALL, color=(0, 180, 0))
-        display_frame = draw_korean_text(display_frame, " ".join(output_sentence), (10, 100), font=FONT_SMALL, color=(255, 0, 0))
-    else:
-        display_frame = draw_korean_text(display_frame, "수어 인식 중...", (10, 30), font=FONT, color=(0, 0, 255))
+    if len(output_sentence) > 0 and (time.time() - last_add_time > RESET_INTERVAL):
+        output_sentence = []
+        print(f"[RESET] {RESET_INTERVAL}초 경과로 누적 문장 전체 초기화")
 
-    # 랜드마크 시각화
     mp_drawing.draw_landmarks(display_frame, results.pose_landmarks, mp_holistic.POSE_CONNECTIONS)
     mp_drawing.draw_landmarks(display_frame, results.left_hand_landmarks, mp_holistic.HAND_CONNECTIONS)
     mp_drawing.draw_landmarks(display_frame, results.right_hand_landmarks, mp_holistic.HAND_CONNECTIONS)

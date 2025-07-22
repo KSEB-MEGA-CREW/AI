@@ -2,24 +2,22 @@ import cv2
 import mediapipe as mp
 import numpy as np
 import os
-import time
+import time  # ← 추가
+from datetime import datetime
 
-SAVE_DIR = "None"
+SAVE_DIR = r"C:\SoftwareEdu2025\project\Hand_Sound\KCH\signtotext\None"
 os.makedirs(SAVE_DIR, exist_ok=True)
 
-LABEL = "none"
-DURATION = 5
-EXPECTED_LEN = 194
-FPS = 10
-FRAME_COUNT = DURATION * FPS
+expected_len = 194
+SEQ_LEN = 10
+POSE_SKIP_INDEXES = set(range(17, 33))
 
-mp_holistic = mp.solutions.holistic
 
-def extract_landmarks(landmarks, dims, select_indexes=None):
+def extract_landmarks(landmarks, dims, skip=None):
     result = []
     if landmarks:
         for i, lm in enumerate(landmarks.landmark):
-            if select_indexes is not None and i not in select_indexes:
+            if skip and i in skip:
                 continue
             coords = [lm.x, lm.y, lm.z]
             if dims == 4:
@@ -27,59 +25,79 @@ def extract_landmarks(landmarks, dims, select_indexes=None):
             result.extend(coords)
     return result
 
-holistic = mp_holistic.Holistic(min_detection_confidence=0.5, min_tracking_confidence=0.5)
+
+mp_holistic = mp.solutions.holistic
+holistic = mp_holistic.Holistic(
+    min_detection_confidence=0.7, min_tracking_confidence=0.7
+)
+
 cap = cv2.VideoCapture(0)
+print("[INFO] s키를 누르면 None 데이터 수집 시작 (프레임 10장 저장)")
+print("[INFO] q키를 누르면 종료")
 
-sample_id = 1
-print(f"⏺️ '{LABEL}' 데이터 수집 시작 (Q: 종료, S: 저장 시작)")
-
-while cap.isOpened():
+while True:
     ret, frame = cap.read()
     if not ret:
-        break
+        continue
+    display_frame = frame.copy()
+    cv2.putText(display_frame, "Press 's' to record None data, 'q' to quit", (10, 30),
+                cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 50, 50), 2)
+    cv2.imshow("None Data Collection", display_frame)
 
-    image_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-    results = holistic.process(image_rgb)
-
-    cv2.putText(frame, f"Label: {LABEL} (S: 수집시작, Q: 종료)", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 0, 0), 2)
-    cv2.imshow("수어 (None) 수집", frame)
     key = cv2.waitKey(1) & 0xFF
+    if key == ord('s'):
+        print("수집 시작까지 1초 대기...")
+        time.sleep(1)  # ⭐️ 1초 대기
 
-    if key == ord('q'):
-        break
-
-    elif key == ord('s'):
-        print("▶ 5초간 데이터 수집 시작...")
-        sequence = []
-
-        while len(sequence) < FRAME_COUNT:
+        print("수집 시작...")
+        buffer = []
+        collect_count = 0
+        while collect_count < SEQ_LEN:
             ret, frame = cap.read()
+            if not ret:
+                continue
             image_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
             results = holistic.process(image_rgb)
 
+            # ① 손/포즈 인식 여부 확인
+            if (
+                    results.left_hand_landmarks is None and
+                    results.right_hand_landmarks is None and
+                    results.pose_landmarks is None
+            ):
+                print("[SKIP] 손/포즈 인식 안 됨. 이 프레임은 None 데이터로 저장 X")
+                continue  # skip
+
             lh = extract_landmarks(results.left_hand_landmarks, 3)
             rh = extract_landmarks(results.right_hand_landmarks, 3)
-            pose = extract_landmarks(results.pose_landmarks, 4, select_indexes=set(range(17)))  # 0~16번만 사용
-
+            pose = extract_landmarks(results.pose_landmarks, 4, skip=POSE_SKIP_INDEXES)
             keypoints = lh + rh + pose
 
-            if len(keypoints) < EXPECTED_LEN:
-                keypoints += [0.0] * (EXPECTED_LEN - len(keypoints))
-            elif len(keypoints) > EXPECTED_LEN:
-                keypoints = keypoints[:EXPECTED_LEN]
+            # 입력 길이 맞추기 (0패딩)
+            if len(keypoints) < expected_len:
+                keypoints += [0.0] * (expected_len - len(keypoints))
+            elif len(keypoints) > expected_len:
+                keypoints = keypoints[:expected_len]
 
-            sequence.append(keypoints)
+            buffer.append(keypoints)
+            collect_count += 1
 
-            cv2.putText(frame, f"Collecting frame {len(sequence)}/{FRAME_COUNT}", (10, 60),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 180, 0), 2)
-            cv2.imshow("수어 (None) 수집", frame)
+            # 진행 상황 표시
+            cv2.putText(frame, f"Collecting None ({collect_count}/{SEQ_LEN})", (10, 30),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 200, 255), 2)
+            cv2.imshow("None Data Collection", frame)
             if cv2.waitKey(1) & 0xFF == ord('q'):
                 break
 
-        npy_path = os.path.join(SAVE_DIR, f"none_{sample_id:03d}.npy")
-        np.save(npy_path, np.array(sequence))
-        print(f"✅ 저장 완료: {npy_path}")
-        sample_id += 1
+        # npy 파일 저장
+        buffer_np = np.array(buffer)
+        now = datetime.now().strftime("%Y%m%d_%H%M%S")
+        fname = f"none_{now}.npy"
+        np.save(os.path.join(SAVE_DIR, fname), buffer_np)
+        print(f"[SAVE] None 데이터 저장: {fname}  shape={buffer_np.shape}")
+
+    elif key == ord('q'):
+        break
 
 cap.release()
 cv2.destroyAllWindows()
