@@ -137,7 +137,7 @@ dependencies:
       - matplotlib==3.10.3
       - mdurl==0.1.2
       - mediapipe==0.10.21
-      - ml-dtypes==0.4.1
+      - ml-dtypes==0.5.1
       - mpmath==1.3.0
       - multidict==6.6.3
       - multiprocess==0.70.16
@@ -179,14 +179,15 @@ dependencies:
       - sounddevice==0.5.2
       - sqlparse==0.5.3
       - sympy==1.14.0
-      - tensorboard==2.18.0
+      - tensorboard==2.19.0
       - tensorboard-data-server==0.7.2
       - tensorboard-plugin-wit==1.8.1
-      - tensorflow==2.10.0
+      - tensorflow==2.19.0
       - tensorflow-estimator==2.10.0
       - tensorflow-intel==2.18.0
       - tensorflow-io-gcs-filesystem==0.31.0
       - termcolor==3.1.0
+      - tf-keras==2.19.0
       - tokenizers==0.21.2
       - torch==2.7.1
       - torchvision==0.22.1

@@ -7,9 +7,15 @@ from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
 # 'datasets' 라이브러리에서 'Dataset' 클래스를 임포트합니다.
 from datasets import Dataset
 # 사용자의 데이터 로드 함수를 임포트합니다.
-import data_load
-import config
+import util.data_load as data_load
 import os
+import sys
+
+# Add the parent directory ('text_to_word') to the system path
+# to allow importing modules from it (e.g., config.py).
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+import config
 
 # 1. 기본 변수 및 데이터 로드
 # 원본 사전 학습 모델
@@ -197,24 +203,25 @@ def load_model(model_dir=NEW_MODEL_DIR, base_model_name=MODEL_NAME):
 # print("저장 완료!")
 
 
-adding_new_token()
+if __name__ == "__main__":
+    adding_new_token()
 
-# 7. 저장된 토크나이저와 모델 다시 로드하여 확인
-print("\n--- 저장된 새 토크나이저와 모델 로드 테스트 ---")
+    # 7. 저장된 토크나이저와 모델 다시 로드하여 확인
+    print("\n--- 저장된 새 토크나이저와 모델 로드 테스트 ---")
 
-loaded_model, loaded_tokenizer = load_model()
-# loaded_tokenizer = AutoTokenizer.from_pretrained(NEW_MODEL_DIR)
-# loaded_model = AutoModelForSeq2SeqLM.from_pretrained(NEW_MODEL_DIR)
+    loaded_model, loaded_tokenizer = load_model()
+    # loaded_tokenizer = AutoTokenizer.from_pretrained(NEW_MODEL_DIR)
+    # loaded_model = AutoModelForSeq2SeqLM.from_pretrained(NEW_MODEL_DIR)
 
-print(f"로드된 토크나이저의 어휘 사전 크기: {len(loaded_tokenizer)}")
+    print(f"로드된 토크나이저의 어휘 사전 크기: {len(loaded_tokenizer)}")
 
-# 추가된 토큰이 잘 처리되는지 테스트
-test_gloss =  extract_unique_gloss()[0] # 아까 찾은 고유 gloss 중 하나로 테스트
-encoded = loaded_tokenizer.encode(test_gloss)
-decoded = loaded_tokenizer.decode(encoded)
+    # 추가된 토큰이 잘 처리되는지 테스트
+    test_gloss =  extract_unique_gloss()[0] # 아까 찾은 고유 gloss 중 하나로 테스트
+    encoded = loaded_tokenizer.encode(test_gloss)
+    decoded = loaded_tokenizer.decode(encoded)
 
-print(f"테스트 Gloss: '{test_gloss}'")
-# [0, 50001, 2] 와 같이 시작/끝 특수 토큰과 함께 단일 ID로 인코딩되어야 합니다.
-print(f"인코딩 결과 (토큰 ID): {encoded}")
-# 디코딩 결과는 원본 gloss와 같아야 합니다.
-print(f"디코딩 결과: '{decoded}'")
+    print(f"테스트 Gloss: '{test_gloss}'")
+    # [0, 50001, 2] 와 같이 시작/끝 특수 토큰과 함께 단일 ID로 인코딩되어야 합니다.
+    print(f"인코딩 결과 (토큰 ID): {encoded}")
+    # 디코딩 결과는 원본 gloss와 같아야 합니다.
+    print(f"디코딩 결과: '{decoded}'")

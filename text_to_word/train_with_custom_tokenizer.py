@@ -20,7 +20,7 @@ from transformers import (
     DataCollatorForSeq2Seq
 )
 # 'data_load' 모듈을 임포트합니다. 데이터 로딩을 위한 사용자 정의 함수가 포함되어 있습니다.
-import data_load
+import util.data_load as data_load
 
 # 스크립트의 메인 로직을 포함하는 'main' 함수를 정의합니다.
 def main():

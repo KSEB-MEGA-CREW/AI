@@ -17,8 +17,9 @@ from transformers import (
     # 'DataCollatorForSeq2Seq'는 Seq2Seq 모델의 학습을 위해 배치(batch) 단위로 데이터를 동적으로 패딩(padding) 처리하는 클래스입니다.
     DataCollatorForSeq2Seq
 )
-import data_load
+import util.data_load as data_load
 import config
+import util.t2g_tokenizer as t2g_tokenizer
 
 # 스크립트의 메인 로직을 포함하는 'main' 함수를 정의합니다.
 def main():
@@ -41,13 +42,16 @@ def main():
         # 'gloss_id' 키에 공백으로 합쳐진 수어 단어(gloss) 문자열 리스트를 할당합니다.
         "gloss_id": [" ".join(item['gloss_id']) for item in train_data]
     }
+    print(processed_data['gloss_id'])
 
-    # print(processed_data)
+    #############################################################
+    # 2. Data Preparation
+
     # 가공된 파이썬 딕셔너리를 Hugging Face의 'Dataset' 객체로 변환합니다.
     dataset = Dataset.from_dict(processed_data)
 
     # 전체 데이터셋을 훈련용(90%)과 검증용(10%)으로 분리합니다. 'test_size=0.1'은 10%를 검증용으로 사용하겠다는 의미입니다.
-    dataset = dataset.train_test_split(test_size=0.2)
+    dataset = dataset.train_test_split(test_size=0.2, seed=42)
     # 분리된 데이터셋에서 훈련용 데이터셋을 'train_dataset' 변수에 할당합니다.
     train_dataset = dataset['train']
     # 분리된 데이터셋에서 검증용 데이터셋을 'eval_dataset' 변수에 할당합니다.
@@ -62,10 +66,9 @@ def main():
     # 'train_dataset[0]'은 훈련 데이터셋의 첫 번째 데이터를 의미합니다.
     print(train_dataset[0])
 
-    # 3. 토크나이저 로드
+    # 3. 모델, 토크나이저 로드
     # 'AutoTokenizer.from_pretrained'를 사용해 'MODEL_NAME'에 해당하는 사전 학습된 모델의 토크나이저를 로드합니다.
-    tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
-    # 4. 데이터 토큰화
+    model, tokenizer = t2g_tokenizer.load_model()
     # 입력 시퀀스(한국어 문장)의 최대 길이를 128 토큰으로 설정합니다. 이보다 길면 잘라냅니다.
     max_input_length = 128
     # 타겟 시퀀스(수어 단어)의 최대 길이를 128 토큰으로 설정합니다.
@@ -96,17 +99,13 @@ def main():
     # 검증 데이터셋 전체에도 동일한 전처리 함수를 적용합니다.
     tokenized_eval_dataset = eval_dataset.map(preprocess_function, batched=True)
 
-    # 5. 모델 로드
-    # 'AutoModelForSeq2SeqLM.from_pretrained'를 사용해 'MODEL_NAME'에 해당하는 사전 학습된 Seq2Seq 모델을 로드합니다.
-    model = AutoModelForSeq2SeqLM.from_pretrained(MODEL_NAME)
-
     # 6. 학습 인자(Arguments) 설정
     # 'Seq2SeqTrainingArguments' 클래스를 사용하여 모델 학습에 필요한 다양한 하이퍼파라미터와 설정을 정의합니다.
     training_args = Seq2SeqTrainingArguments(
         # 학습 결과물(체크포인트, 모델 등)이 저장될 디렉토리를 지정합니다.
         output_dir=OUTPUT_DIR,
         # 평가(evaluation)를 언제 수행할지 결정합니다. "epoch"은 한 에포크가 끝날 때마다 평가를 수행하라는 의미입니다.
-        evaluation_strategy="epoch",
+        eval_strategy="epoch",
         # 학습률(learning rate)을 2e-5 (0.00002)로 설정합니다.
         learning_rate=2e-5,
         # 훈련 시 각 GPU(device) 당 배치 크기를 8로 설정합니다. GPU 메모리에 따라 조절해야 합니다.
@@ -118,7 +117,7 @@ def main():
         # 저장할 최대 체크포인트 수를 3으로 제한합니다. 이 수를 넘으면 가장 오래된 체크포인트가 삭제됩니다.
         save_total_limit=3,
         # 전체 훈련 데이터셋을 총 3번 반복하여 학습(에포크 수)하도록 설정합니다.
-        num_train_epochs=3,
+        num_train_epochs=5,
         # 평가 시 'model.generate()'를 사용하여 BLEU, ROUGE 같은 생성 기반 메트릭을 계산할 수 있도록 설정합니다.
         predict_with_generate=True,
         # 'torch.cuda.is_available()'로 CUDA 지원 GPU가 있을 경우, fp16(16비트 부동소수점) 혼합 정밀도 학습을 활성화하여 메모리 사용량을 줄이고 학습 속도를 높입니다.
@@ -135,6 +134,9 @@ def main():
         metric_for_best_model="eval_loss",
         # 위에서 설정한 메트릭('eval_loss')의 값이 작을수록 더 좋은 모델임을 명시합니다. (loss는 낮을수록 좋음)
         greater_is_better=False,
+        # Set a seed for reproducible training. This ensures that aspects like model
+        # weight initialization and data shuffling are the same for each run.
+        seed=42,
     )
 
     # 7. 데이터 콜레이터 정의

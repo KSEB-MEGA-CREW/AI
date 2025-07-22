@@ -70,5 +70,6 @@ __pycache__/
 *.db
 *.sqlite3
 
-GEMINI.md
 kobart-custom-tokenizer/
+kobart-finetuned-ksl-glosser/
+KSEB_json_data/
