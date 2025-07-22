@@ -36,6 +36,8 @@ saved_model/
 # 사용자 데이터
 *.npy
 *.csv
+*.json
+*.jsonl
 
 # 데이터셋
 KCH/signtotext/dataset/
@@ -66,3 +68,8 @@ __pycache__/
 *.pid
 *.db
 *.sqlite3
+
+# 김동혁의 모델 데이터 용량이 너무 커서 ignore 합니다. 
+kobart-custom-tokenizer/
+kobart-finetuned-ksl-glosser/
+KSEB_json_data/
