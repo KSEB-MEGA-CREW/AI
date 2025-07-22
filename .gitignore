@@ -25,7 +25,6 @@ Thumbs.db
 .idea/
 
 # 모델 및 훈련 파일
-*.h5
 *.tflite
 *.pb
 *.pkl
@@ -37,15 +36,14 @@ saved_model/
 # 사용자 데이터
 *.npy
 *.csv
-*.json
 
 # 데이터셋
-dataset/
+KCH/signtotext/dataset/
+KCH/signtotext/2024_LI_DC_0779230-0789690_1035/
 data/
 *.zip
 
 # 결과 이미지, 영상
-output_npy/
 output/
 results/
 *.jpg

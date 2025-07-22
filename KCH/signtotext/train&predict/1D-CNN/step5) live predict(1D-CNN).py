@@ -6,15 +6,14 @@ import time
 from tensorflow.keras.models import load_model
 
 # 🔹 모델 및 라벨 로딩 (절대경로 사용!)
-MODEL_PATH = r"C:\SoftwareEdu2025\project\Hand_Sound\KCH\signtotext\train&predict\models\testnone_model_model\gesture_model.h5"
-LABEL_PATH = r"C:\SoftwareEdu2025\project\Hand_Sound\KCH\signtotext\train&predict\models\testnone_model_model\label_map.json"
+MODEL_PATH = r"C:\SoftwareEdu2025\project\Hand_Sound\KCH\signtotext\train&predict\models\test_model(4)\gesture_model.h5"
+LABEL_PATH = r"C:\SoftwareEdu2025\project\Hand_Sound\KCH\signtotext\train&predict\models\test_model(4)\label_map.json"
 
 model = load_model(MODEL_PATH)
 with open(LABEL_PATH, "r", encoding="utf-8") as f:
     label_list = json.load(f)
 label_map = {i: label for i, label in enumerate(label_list)}
 
-# 🔹 MediaPipe 설정
 mp_holistic = mp.solutions.holistic
 mp_drawing = mp.solutions.drawing_utils
 holistic = mp_holistic.Holistic(
@@ -22,19 +21,19 @@ holistic = mp_holistic.Holistic(
 )
 
 POSE_SKIP_INDEXES = set(range(17, 33))
-expected_len = 194      # 모델/데이터에 맞게 동일
-BUFFER_SIZE = 10        # 현재 학습시 시퀀스 프레임
-CONFIDENCE_THRESHOLD = 0.5
+expected_len = 194
+BUFFER_SIZE = 10
+CONFIDENCE_THRESHOLD = 0.7   # <-- 정확도 기준 높임!
 
 cap = cv2.VideoCapture(0)
 frame_buffer = []
 last_stable_label = None
 stable_count = 0
 output_sentence = []
-STABLE_THRESHOLD = 3   # 연속 3프레임 예측 시 누적
+STABLE_THRESHOLD = 3
 
-last_add_time = time.time()   # 마지막 단어 추가 시각
-RESET_INTERVAL = 5.0          # 5초간 새 단어 없으면 전체 문장 초기화
+last_add_time = time.time()
+RESET_INTERVAL = 5.0
 
 def extract_landmarks(landmarks, dims, skip=None):
     result = []
@@ -64,7 +63,6 @@ while cap.isOpened():
     pose = extract_landmarks(results.pose_landmarks, 4, skip=POSE_SKIP_INDEXES)
     keypoints = lh + rh + pose
 
-    # 입력 길이 맞추기 (패딩)
     if len(keypoints) < expected_len:
         keypoints += [0.0] * (expected_len - len(keypoints))
     elif len(keypoints) > expected_len:
@@ -80,7 +78,6 @@ while cap.isOpened():
             break
         continue
 
-    # 버퍼 쌓기
     frame_buffer.append(keypoints)
     if len(frame_buffer) > BUFFER_SIZE:
         frame_buffer.pop(0)
@@ -97,9 +94,10 @@ while cap.isOpened():
         prediction = model.predict(input_data, verbose=0)
         pred_idx = int(np.argmax(prediction))
         confidence = float(np.max(prediction))
-        predicted_label = label_map.get(pred_idx, "None") if confidence >= CONFIDENCE_THRESHOLD else "None"
+        predicted_label = label_map.get(pred_idx, "none") if confidence >= CONFIDENCE_THRESHOLD else "none"
 
-        if predicted_label != "None":
+        # [수정] 'none'은 누적문장에 추가 X, print만 따로!
+        if predicted_label != "none":
             if predicted_label == last_stable_label:
                 stable_count += 1
             else:
@@ -108,21 +106,21 @@ while cap.isOpened():
             if stable_count == STABLE_THRESHOLD:
                 if len(output_sentence) == 0 or predicted_label != output_sentence[-1]:
                     output_sentence.append(predicted_label)
-                    last_add_time = time.time()  # 단어 추가 시각 갱신!
+                    last_add_time = time.time()
                     if len(output_sentence) > 10:
                         output_sentence = output_sentence[-10:]
                 print(f"[RUN] 예측: {predicted_label}, 정확도: {confidence:.2f}, 누적 문장: {' '.join(output_sentence)}")
         else:
+            # none 예측시 print (누적문장 추가X)
+            print(f"[NONE] 예측: none, 정확도: {confidence:.2f}")
+
             last_stable_label = None
             stable_count = 0
 
-    # --- [NEW] 일정 시간 경과 시 누적 문장 전체 초기화 ---
     if len(output_sentence) > 0 and (time.time() - last_add_time > RESET_INTERVAL):
         output_sentence = []
         print(f"[RESET] {RESET_INTERVAL}초 경과로 누적 문장 전체 초기화")
-    # -----------------------------------------------------
 
-    # 랜드마크 시각화
     mp_drawing.draw_landmarks(display_frame, results.pose_landmarks, mp_holistic.POSE_CONNECTIONS)
     mp_drawing.draw_landmarks(display_frame, results.left_hand_landmarks, mp_holistic.HAND_CONNECTIONS)
     mp_drawing.draw_landmarks(display_frame, results.right_hand_landmarks, mp_holistic.HAND_CONNECTIONS)
