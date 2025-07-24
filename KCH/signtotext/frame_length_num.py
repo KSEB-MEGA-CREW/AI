@@ -2,13 +2,14 @@ import os
 import numpy as np
 from collections import Counter
 
-DATA_PATH = r"C:\SoftwareEdu2025\project\Hand_Sound\KCH\signtotext\output_npy\test"
+DATA_PATH = r"C:\SoftwareEdu2025\project\Hand_Sound\KCH\signtotext\output_npy\일상생활_학교"
 frame_lengths = []
 
-for fname in os.listdir(DATA_PATH):
-    if fname.endswith(".npy"):
-        arr = np.load(os.path.join(DATA_PATH, fname))
-        frame_lengths.append(arr.shape[0])
+for root, dirs, files in os.walk(DATA_PATH):
+    for fname in files:
+        if fname.endswith(".npy"):
+            arr = np.load(os.path.join(root, fname))
+            frame_lengths.append(arr.shape[0])
 
 print("프레임 길이 분포:", Counter(frame_lengths))
 print("최소프레임:", min(frame_lengths), "최대프레임:", max(frame_lengths))

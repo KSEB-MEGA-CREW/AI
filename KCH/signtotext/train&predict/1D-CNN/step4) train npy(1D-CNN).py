@@ -15,36 +15,47 @@ from bayes_opt import BayesianOptimization
 matplotlib.rcParams['font.family'] = 'Malgun Gothic'
 matplotlib.rcParams['axes.unicode_minus'] = False
 
-DATA_PATH = r"C:\SoftwareEdu2025\project\Hand_Sound\KCH\signtotext\output_npy\test"
-REQUIRED_FRAMES = 10
+DATA_PATH = r"C:\SoftwareEdu2025\project\Hand_Sound\KCH\sign    totext\output_npy\일상생활_학교"
+REQUIRED_FRAMES = 12
 EXPECTED_LEN = 194
 MIN_VALID_FRAMES = 7
 MAX_PADDING_RATIO = 0.4
 
-SAVE_DIR = r"C:\SoftwareEdu2025\project\Hand_Sound\KCH\signtotext\train&predict\models\test_model"
+SAVE_DIR = r"C:\SoftwareEdu2025\project\Hand_Sound\KCH\signtotext\train&predict\1D-CNN\models\일상_학교"
 os.makedirs(SAVE_DIR, exist_ok=True)
 
 label_files = defaultdict(list)
+error_files = []
+
 for root, dirs, files in os.walk(DATA_PATH):
-    for fname in files:
-        if fname.endswith(".npy"):
+    for file in files:
+        if file.endswith(".npy"):
             try:
-                # ① none은 무조건 'none' 라벨, 그 외는 파일명 첫 부분
-                if fname.startswith("none"):
+                # ⭐️ none 파일은 "none" 라벨, 그 외는 두 번째 언더바 이후를 라벨로
+                if file.startswith("none"):
                     label = "none"
                 else:
-                    label = fname.split("_")[0]
-                label_files[label].append(os.path.join(root, fname))
+                    name_split = file.split("_")
+                    if len(name_split) >= 2:
+                        label_part = name_split[1]
+                        label = label_part.split(".")[0]
+                    else:
+                        error_files.append(os.path.join(root, file))
+                        continue
+                label_files[label].append(os.path.join(root, file))
             except Exception as e:
-                print(f"❌ 파일명 파싱 오류: {fname} ({e})")
+                print(f"❌ 파일명 파싱 오류: {file} ({e})")
+                error_files.append(os.path.join(root, file))
 
-# (1) 내림차순 정렬 + 번호 출력
+# [★] 라벨별 개수 내림차순 정렬 및 출력 (이전 코드와 동일)
 label_count_list = sorted(label_files.items(), key=lambda x: len(x[1]), reverse=True)
 print("\n라벨별 npy 개수 (개수 많은 순, 번호순):")
 for i, (label, files) in enumerate(label_count_list, 1):
     print(f"{i:3d}. {label:15s}: {len(files)}개")
 print(f"\n총 라벨 수: {len(label_files)}개")
 print(f"총 npy 파일 수: {sum(len(files) for _, files in label_count_list)}개")
+if error_files:
+    print(f"\n[⚠️ 파싱 불가 파일]: {error_files}")
 
 file_counts = [len(files) for files in label_files.values()]
 if file_counts:

@@ -23,7 +23,7 @@ holistic = mp_holistic.Holistic(
 POSE_SKIP_INDEXES = set(range(17, 33))
 expected_len = 194
 BUFFER_SIZE = 10
-CONFIDENCE_THRESHOLD = 0.7   # <-- 정확도 기준 높임!
+CONFIDENCE_THRESHOLD = 0.98   # <-- 정확도 기준 높임!
 
 cap = cv2.VideoCapture(0)
 frame_buffer = []
