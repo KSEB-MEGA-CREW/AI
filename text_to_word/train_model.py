@@ -39,7 +39,7 @@ def data_train():
     # 위에서 정의한 'load_jsonl' 함수를 호출하여 학습 데이터를 로드합니다.
     train_data = data_load.load_jsonl(DATA_PATH)
     
-    # Hugging Face의 'Dataset' 객체로 변환하기 위해 데이터를 딕셔너리 형태로 가공합니다.
+    #  Hugging Face의 'Dataset' 객체로 변환하기 위해 데이터를 딕셔너리 형태로 가공합니다.
     # 'gloss_id'는 원래 리스트 형태이므로, 각 요소를 공백으로 연결하여 하나의 문자열로 변환합니다.
     processed_data = {
         # 'koreanText' 키에 모든 한국어 문장 리스트를 할당합니다.
