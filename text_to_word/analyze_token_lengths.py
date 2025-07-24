@@ -6,8 +6,8 @@ import config
 
 # Load the tokenizer from the specified directory
 # This is the tokenizer that has been updated with new tokens
-NEW_MODEL_DIR = config.NEW_MODEL_DIR
-tokenizer = AutoTokenizer.from_pretrained(NEW_MODEL_DIR)
+CUSTOM_TOKENIZER = config.CUSTOM_TOKENIZER
+tokenizer = AutoTokenizer.from_pretrained(CUSTOM_TOKENIZER)
 
 # --- Data Loading ---
 # Load the preprocessed data from the JSONL file
