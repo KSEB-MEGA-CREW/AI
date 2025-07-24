@@ -23,7 +23,7 @@ MODEL_NAME = config.MODEL_NAME
 # 학습 데이터 경로
 DATA_PATH = config.DATA_PATH
 # 새 토크나이저와 모델을 저장할 디렉토리
-NEW_MODEL_DIR = config.NEW_MODEL_DIR
+CUSTOM_TOKENIZER = config.CUSTOM_TOKENIZER
 
 # 전체 데이터를 로드합니다 (토큰 추출을 위해 limit 없이).
 full_data = data_load.load_jsonl(DATA_PATH)
@@ -106,17 +106,17 @@ def  adding_new_token(MODEL_NAME = MODEL_NAME, data = full_data):
     model.resize_token_embeddings(new_vocab_size)
 
     # 6. 업데이트된 토크나이저와 모델 저장
-    print(f"업데이트된 토크나이저와 모델을 '{NEW_MODEL_DIR}'에 저장합니다.")
-    tokenizer.save_pretrained(NEW_MODEL_DIR)
-    model.save_pretrained(NEW_MODEL_DIR)
+    print(f"업데이트된 토크나이저와 모델을 '{CUSTOM_TOKENIZER}'에 저장합니다.")
+    tokenizer.save_pretrained(CUSTOM_TOKENIZER)
+    model.save_pretrained(CUSTOM_TOKENIZER)
     print("저장 완료!")
 
 # def load_model():
 #     print("\n--- 저장된 새 토크나이저와 모델 로드 테스트 ---")
-#     loaded_model = AutoModelForSeq2SeqLM.from_pretrained(NEW_MODEL_DIR)
+#     loaded_model = AutoModelForSeq2SeqLM.from_pretrained(CUSTOM_TOKENIZER)
 #     return loaded_model
 
-def load_model(model_dir=NEW_MODEL_DIR, base_model_name=MODEL_NAME):
+def load_model(model_dir=CUSTOM_TOKENIZER, base_model_name=MODEL_NAME):
     """
     If a model exists in the specified directory (model_dir), it will load that model and torqueizer; 
     if  does not exist, it will load the default model (base_model_name) from the Hugging Face hub.
@@ -197,9 +197,9 @@ def load_model(model_dir=NEW_MODEL_DIR, base_model_name=MODEL_NAME):
 # model.resize_token_embeddings(new_vocab_size)
 
 # # 6. 업데이트된 토크나이저와 모델 저장
-# print(f"업데이트된 토크나이저와 모델을 '{NEW_MODEL_DIR}'에 저장합니다.")
-# tokenizer.save_pretrained(NEW_MODEL_DIR)
-# model.save_pretrained(NEW_MODEL_DIR)
+# print(f"업데이트된 토크나이저와 모델을 '{CUSTOM_TOKENIZER}'에 저장합니다.")
+# tokenizer.save_pretrained(CUSTOM_TOKENIZER)
+# model.save_pretrained(CUSTOM_TOKENIZER)
 # print("저장 완료!")
 
 
@@ -210,8 +210,8 @@ if __name__ == "__main__":
     print("\n--- 저장된 새 토크나이저와 모델 로드 테스트 ---")
 
     loaded_model, loaded_tokenizer = load_model()
-    # loaded_tokenizer = AutoTokenizer.from_pretrained(NEW_MODEL_DIR)
-    # loaded_model = AutoModelForSeq2SeqLM.from_pretrained(NEW_MODEL_DIR)
+    # loaded_tokenizer = AutoTokenizer.from_pretrained(CUSTOM_TOKENIZER)
+    # loaded_model = AutoModelForSeq2SeqLM.from_pretrained(CUSTOM_TOKENIZER)
 
     print(f"로드된 토크나이저의 어휘 사전 크기: {len(loaded_tokenizer)}")
 
