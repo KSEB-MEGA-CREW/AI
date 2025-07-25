@@ -1,7 +1,7 @@
 import os
 from collections import Counter
 
-DATA_PATH = r"C:\SoftwareEdu2025\project\Hand_Sound\KCH\signtotext\output_npy\일상대화"
+DATA_PATH = r"C:\SoftwareEdu2025\project\Hand_Sound\KCH\signtotext\output_npy\일상생활_학교"
 
 label_counts = Counter()
 error_files = []
