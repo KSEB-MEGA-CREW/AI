@@ -15,7 +15,7 @@ from bayes_opt import BayesianOptimization
 matplotlib.rcParams['font.family'] = 'Malgun Gothic'
 matplotlib.rcParams['axes.unicode_minus'] = False
 
-DATA_PATH = r"C:\SoftwareEdu2025\project\Hand_Sound\KCH\sign    totext\output_npy\일상생활_학교"
+DATA_PATH = r"C:\SoftwareEdu2025\project\Hand_Sound\KCH\signtotext\output_npy"
 REQUIRED_FRAMES = 12
 EXPECTED_LEN = 194
 MIN_VALID_FRAMES = 7

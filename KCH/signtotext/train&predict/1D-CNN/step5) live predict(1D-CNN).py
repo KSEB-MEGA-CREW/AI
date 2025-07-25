@@ -6,8 +6,8 @@ import time
 from tensorflow.keras.models import load_model
 
 # 🔹 모델 및 라벨 로딩 (절대경로 사용!)
-MODEL_PATH = r"C:\SoftwareEdu2025\project\Hand_Sound\KCH\signtotext\train&predict\models\test_model(4)\gesture_model.h5"
-LABEL_PATH = r"C:\SoftwareEdu2025\project\Hand_Sound\KCH\signtotext\train&predict\models\test_model(4)\label_map.json"
+MODEL_PATH = r"C:\SoftwareEdu2025\project\Hand_Sound\KCH\signtotext\train&predict\1D-CNN\models\일상_학교(4)\gesture_model.h5"
+LABEL_PATH = r"C:\SoftwareEdu2025\project\Hand_Sound\KCH\signtotext\train&predict\1D-CNN\models\일상_학교(4)\label_map.json"
 
 model = load_model(MODEL_PATH)
 with open(LABEL_PATH, "r", encoding="utf-8") as f:
@@ -22,8 +22,8 @@ holistic = mp_holistic.Holistic(
 
 POSE_SKIP_INDEXES = set(range(17, 33))
 expected_len = 194
-BUFFER_SIZE = 10
-CONFIDENCE_THRESHOLD = 0.98   # <-- 정확도 기준 높임!
+BUFFER_SIZE = 12
+CONFIDENCE_THRESHOLD = 0.6   # <-- 정확도 기준 높임!
 
 cap = cv2.VideoCapture(0)
 frame_buffer = []
