@@ -21,18 +21,21 @@ from transformers import (
 )
 # 'data_load' 모듈을 임포트합니다. 데이터 로딩을 위한 사용자 정의 함수가 포함되어 있습니다.
 import util.data_load as data_load
+import config
 
 # 스크립트의 메인 로직을 포함하는 'main' 함수를 정의합니다.
 def main():
     # 1. 기본 변수 설정
     # 사용할 사전 학습된 KoBART 모델의 이름을 Hugging Face 허브에서 가져와 설정합니다.
-    MODEL_NAME = "ehekaanldk/kobart2ksl-translation"
+    MODEL_NAME = config.MODEL_NAME
     # 학습에 사용할 데이터 파일(.jsonl)의 경로를 설정합니다.
-    DATA_PATH = "C:/Users/Hyuk/Documents/대학/부트켐프/메인 프로젝트/AI/text_to_word/processed_data.jsonl"
+    DATA_PATH = config.DATA_PATH
     # 데이터셋의 모든 고유 gloss를 추가하여 만든 커스텀 토크나이저를 저장할 디렉토리 경로를 설정합니다.
-    TOKENIZER_SAVE_DIR = "C:/Users/Hyuk/Documents/대학/부트켐프/메인 프로젝트/AI/text_to_word/ksl-tokenizer"
+    TOKENIZER_SAVE_DIR = config.NEW_MODEL_DIR
     # 파인튜닝된 모델과 최종 토크나이저, 그리고 학습 로그가 저장될 디렉토리 경로를 설정합니다.
-    OUTPUT_DIR = "C:/Users/Hyuk/Documents/대학/부트켐프/메인 프로젝트/AI/text_to_word/kobart-finetuned-ksl-glosser-custom-vocab"
+    OUTPUT_DIR = config.OUTPUT_DIR
+
+    # NEW_MODEL_DIR = config.NEW_MODEL_DIR
 
     # 위에서 정의한 'load_jsonl' 함수를 호출하여 학습 데이터를 로드합니다.
     train_data = data_load.load_jsonl(DATA_PATH, limit=1000)
