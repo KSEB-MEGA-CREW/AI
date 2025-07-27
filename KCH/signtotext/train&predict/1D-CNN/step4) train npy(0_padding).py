@@ -13,8 +13,8 @@ from tensorflow.keras.optimizers import Adam
 from bayes_opt import BayesianOptimization
 
 # ===== 설정 =====
-DATA_PATH = r"C:\SoftwareEdu2025\project\Hand_Sound\KCH\signtotext\output_npy\before"
-SAVE_DIR = r"C:\SoftwareEdu2025\project\Hand_Sound\KCH\signtotext\train&predict\1D-CNN\models\test"
+DATA_PATH = r"C:\SoftwareEdu2025\project\Hand_Sound\KCH\signtotext\My data\dataset"
+SAVE_DIR = r"C:\SoftwareEdu2025\project\Hand_Sound\KCH\signtotext\My data\models"
 os.makedirs(SAVE_DIR, exist_ok=True)
 
 REQUIRED_FRAMES = 12
