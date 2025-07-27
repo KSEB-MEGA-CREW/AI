@@ -1,3 +1,5 @@
+# 최적화된 얼굴+손+팔 포인트만 추출하는 .mp4 → .npy 변환 코드
+
 import cv2
 import mediapipe as mp
 import numpy as np
@@ -6,26 +8,23 @@ import os
 import re
 
 def sanitize_filename(name):
-    # 파일 이름으로 사용할 수 없는 문자를 '_'로 대체
-    return re.sub(r'[:\/\\?*<>|"]', '_', name)
+    return re.sub(r'[:/\\?*<>|"]', '_', name)
 
-# 경로 설정
-root_folder = r"D:\NIKL_Sign Language Parallel Corpus_2024_LI_SH\2024_0939270-0970090_3053_LI_SH1"
-output_dir = r"C:\KEB_bootcamp\project\AI\KCH\signtotext\output_npy\일상생활_학교"
+root_folder = r"C:\SoftwareEdu2025\project\Hand_Sound\KCH\signtotext\2024_LI_DC_0779230-0789690_1035"
+output_dir = r"C:\KEB_bootcamp\project\AI\KCH\signtotext\output_npy\test"
 os.makedirs(output_dir, exist_ok=True)
 
-# 추출할 포즈 인덱스 및 기대하는 keypoint 수
-POSE_INDEXES = list(range(17))
-expected_len = 21*3 + 21*3 + 17*4
+# 선택된 랜드마크 인덱스
+SELECTED_FACE_INDEXES = [10,11,12,13,14,15,23,24,25,26,27,61,62,63,64,65,66,67,68,69,70,71,72]  # 눈썹, 코, 입 중심
+POSE_INDEXES = [11,12,13,14,15,16]  # 어깨~손목
+expected_len = 21*3 + 21*3 + len(SELECTED_FACE_INDEXES)*3 + len(POSE_INDEXES)*4
 
-# 처리 범위 설정
-start_num = 240939270   # 시작 번호 (예시)
-stop_num = 240970090    # 종료 번호 (예시)
+start_num = 240781060
+stop_num = 240789690
 step = +10
 
 mp_holistic = mp.solutions.holistic
 
-# 랜드마크 추출 함수
 def extract_landmarks(landmarks, dims, idxs=None):
     result = []
     if landmarks:
@@ -40,27 +39,25 @@ def extract_landmarks(landmarks, dims, idxs=None):
             result.extend(coords)
     return result
 
-# 메인 루프
-for num in range(start_num, stop_num-1, step):
+for num in range(start_num, stop_num, step):
     base_id = f"VXPAKOKS{num}"
     json_path = os.path.join(root_folder, f"{base_id}.json")
     video_path = os.path.join(root_folder, f"{base_id}.mp4")
 
     if not (os.path.exists(json_path) and os.path.exists(video_path)):
-        print(f"  ⚠️ {base_id} 파일 없음: {json_path} 또는 {video_path}")
+        print(f"  ⚠️ {base_id} 파일 없음")
         continue
 
-    # JSON 읽기
     with open(json_path, "r", encoding="utf-8") as f:
         data = json.load(f)
     fps = data.get("potogrf", {}).get("fps", 30)
     sign_gestures = data.get("sign_script", {}).get("sign_gestures_strong", [])
 
-    # mp4 전체 프레임 처리
     cap = cv2.VideoCapture(video_path)
     all_keypoints = []
     with mp_holistic.Holistic(
-        min_detection_confidence=0.7, min_tracking_confidence=0.7
+        min_detection_confidence=0.7,
+        min_tracking_confidence=0.7
     ) as holistic:
         while True:
             ret, frame = cap.read()
@@ -70,8 +67,9 @@ for num in range(start_num, stop_num-1, step):
             results = holistic.process(image_rgb)
             lh = extract_landmarks(results.left_hand_landmarks, 3)
             rh = extract_landmarks(results.right_hand_landmarks, 3)
+            face = extract_landmarks(results.face_landmarks, 3, idxs=SELECTED_FACE_INDEXES)
             pose = extract_landmarks(results.pose_landmarks, 4, idxs=POSE_INDEXES)
-            keypoints = lh + rh + pose
+            keypoints = lh + rh + face + pose
             if len(keypoints) < expected_len:
                 keypoints += [0.0] * (expected_len - len(keypoints))
             elif len(keypoints) > expected_len:
@@ -80,19 +78,16 @@ for num in range(start_num, stop_num-1, step):
     cap.release()
     all_keypoints = np.array(all_keypoints)
 
-    # gloss 단위로 나눠 저장
     for gloss in sign_gestures:
-        gloss_id = str(gloss['gloss_id']).strip()  # ✅ 앞뒤 공백 제거
+        gloss_id = str(gloss['gloss_id']).strip()
         gloss_id_clean = sanitize_filename(gloss_id.replace('.npy', '').replace('.NPY', ''))
-
         start_sec = gloss['start']
         end_sec = gloss['end']
         start_frame = int(round(start_sec * fps))
         end_frame = int(round(end_sec * fps))
         gloss_keypoints = all_keypoints[start_frame:end_frame+1]
 
-        # 라벨별 폴더 저장
-        label_dir = os.path.join(output_dir, gloss_id_clean)  # gloss_id_clean은 이미 strip됨
+        label_dir = os.path.join(output_dir, gloss_id_clean)
         os.makedirs(label_dir, exist_ok=True)
         out_name = f"{base_id}_{gloss_id_clean}.npy"
         out_path = os.path.join(label_dir, out_name)
@@ -104,4 +99,4 @@ for num in range(start_num, stop_num-1, step):
         np.save(out_path, gloss_keypoints)
         print(f"  ⬇️ 저장: {out_path} (shape={gloss_keypoints.shape})")
 
-print("✅ 변환 완료")
+print("✅ 선택적 랜드마크 변환 완료")
