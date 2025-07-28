@@ -4,9 +4,9 @@ import json
 from tensorflow.keras.models import load_model
 
 # ===== 설정 =====
-MODEL_PATH = r"C:\SoftwareEdu2025\project\Hand_Sound\KCH\signtotext\My data\models\gesture_model.h5"
-LABEL_PATH = r"C:\SoftwareEdu2025\project\Hand_Sound\KCH\signtotext\My data\models\label_map.json"
-DATA_DIR = r"C:\SoftwareEdu2025\project\Hand_Sound\KCH\signtotext\My data\dataset"  # 예측할 npy 폴더
+MODEL_PATH = r"C:\KEB_bootcamp\project\AI\KCH\signtotext\train&predict\1D-CNN\models\test\gesture_model.h5"
+LABEL_PATH = r"C:\KEB_bootcamp\project\AI\KCH\signtotext\train&predict\1D-CNN\models\test\label_map.json"
+DATA_DIR = r"C:\cleaned_npy\잘하다2"  # 예측할 npy 폴더
 REQUIRED_FRAMES = 12
 EXPECTED_LEN = 194
 MIN_VALID_FRAMES = 5
@@ -59,4 +59,11 @@ else:
         pred_label = label_list[pred_idx]
         confidence = pred_probs[pred_idx]
 
-        print(f"[{i:02d}] {fname:35s} → 예측: {pred_label:10s} | 정확도: {confidence:.4f}")
+        # 파일명 기준 실제 라벨 추출 (예: 지시1#_0001.npy → 지시1#)
+        true_label = os.path.basename(DATA_DIR)
+
+        if pred_label != true_label:
+            print(f"[{i:02d}] {fname:35s} → ❌ {pred_label} (정답: {true_label}) → 삭제됨")
+            os.remove(path)
+        else:
+            print(f"[{i:02d}] {fname:35s} → ✅ {pred_label} | 정확도: {confidence:.4f}")
