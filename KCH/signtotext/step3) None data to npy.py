@@ -2,15 +2,16 @@ import cv2
 import mediapipe as mp
 import numpy as np
 import os
+import time  # ← 추가
 from datetime import datetime
 
-# 데이터 저장 경로
 SAVE_DIR = r"C:\SoftwareEdu2025\project\Hand_Sound\KCH\signtotext\None"
 os.makedirs(SAVE_DIR, exist_ok=True)
 
-expected_len = 194   # 1프레임 keypoints feature 길이
-SEQ_LEN = 10         # 수집할 프레임 수 (학습과 맞춰서)
+expected_len = 194
+SEQ_LEN = 12
 POSE_SKIP_INDEXES = set(range(17, 33))
+
 
 def extract_landmarks(landmarks, dims, skip=None):
     result = []
@@ -23,6 +24,7 @@ def extract_landmarks(landmarks, dims, skip=None):
                 coords.append(getattr(lm, 'visibility', 0.0))
             result.extend(coords)
     return result
+
 
 mp_holistic = mp.solutions.holistic
 holistic = mp_holistic.Holistic(
@@ -44,6 +46,9 @@ while True:
 
     key = cv2.waitKey(1) & 0xFF
     if key == ord('s'):
+        print("수집 시작까지 1초 대기...")
+        time.sleep(1)  # ⭐️ 1초 대기
+
         print("수집 시작...")
         buffer = []
         collect_count = 0
@@ -56,9 +61,9 @@ while True:
 
             # ① 손/포즈 인식 여부 확인
             if (
-                results.left_hand_landmarks is None and
-                results.right_hand_landmarks is None and
-                results.pose_landmarks is None
+                    results.left_hand_landmarks is None and
+                    results.right_hand_landmarks is None and
+                    results.pose_landmarks is None
             ):
                 print("[SKIP] 손/포즈 인식 안 됨. 이 프레임은 None 데이터로 저장 X")
                 continue  # skip

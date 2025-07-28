@@ -25,8 +25,8 @@ Thumbs.db
 .idea/
 
 # 모델 및 훈련 파일
-*.h5
 *.tflite
+*.h5
 *.pb
 *.pkl
 *.onnx
@@ -38,14 +38,15 @@ saved_model/
 *.npy
 *.csv
 *.json
+*.jsonl
 
 # 데이터셋
-dataset/
+KCH/signtotext/dataset/
+KCH/signtotext/2024_LI_DC_0779230-0789690_1035/
 data/
 *.zip
 
 # 결과 이미지, 영상
-output_npy/
 output/
 results/
 *.jpg
@@ -68,3 +69,8 @@ __pycache__/
 *.pid
 *.db
 *.sqlite3
+
+# 김동혁의 모델 데이터 용량이 너무 커서 ignore 합니다. 
+kobart-custom-tokenizer/
+kobart-finetuned-ksl-glosser/
+KSEB_json_data/
