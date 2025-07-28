@@ -16,8 +16,8 @@ from PIL import ImageFont, ImageDraw, Image
 
 REQUIRED_FRAMES: int = 12
 EXPECTED_LEN: int = 194
-MODEL_PATH: str = r"C:\SoftwareEdu2025\project\Hand_Sound\KCH\signtotext\train&predict\1D-CNN\models\일상_학교(4)\gesture_model.h5"
-LABEL_MAP_PATH: str = r"C:\SoftwareEdu2025\project\Hand_Sound\KCH\signtotext\train&predict\1D-CNN\models\일상_학교(4)\label_map.json"
+MODEL_PATH: str = r"C:\KEB_bootcamp\project\AI\KCH\signtotext\train&predict\1D-CNN\models\test\gesture_model.h5"
+LABEL_MAP_PATH: str = r"C:\KEB_bootcamp\project\AI\KCH\signtotext\train&predict\1D-CNN\models\test\label_map.json"
 FONT_PATH = "C:/Windows/Fonts/malgun.ttf"
 FONT_SIZE = 30
 font = ImageFont.truetype(FONT_PATH, FONT_SIZE)
