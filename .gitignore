@@ -1,0 +1,4 @@
+*
+!data/
+!word2gloss.py
+!.gitignore
