@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 import time
 
 # 1️⃣ 파일 경로 입력
-npy_file = 'output_npy/VXPAKOKS241101040_일하다1_C.npy'  # ← 본인 npy 경로로 수정
+npy_file = r'C:\want_output_npy\요리1\VXPAKOKS240904720_요리1.npy'  # ← 본인 npy 경로로 수정
 
 # 2️⃣ 데이터 로드
 data = np.load(npy_file)

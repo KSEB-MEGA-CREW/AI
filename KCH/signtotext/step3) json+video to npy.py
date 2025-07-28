@@ -10,8 +10,8 @@ def sanitize_filename(name):
     return re.sub(r'[:\/\\?*<>|"]', '_', name)
 
 # 경로 설정
-root_folder = r"D:\NIKL_Sign Language Parallel Corpus_2024_LI_SH\2024_0939270-0970090_3053_LI_SH1"
-output_dir = r"C:\KEB_bootcamp\project\AI\KCH\signtotext\output_npy\일상생활_학교"
+root_folder = r"D:\NIKL_Sign Language Parallel Corpus_2024_ED_ID\2024_0000000-0042120_4172_ED_ID1"
+output_dir = r"C:\KEB_bootcamp\project\AI\KCH\signtotext\output_npy\교육_인지발달"
 os.makedirs(output_dir, exist_ok=True)
 
 # 추출할 포즈 인덱스 및 기대하는 keypoint 수
@@ -19,8 +19,8 @@ POSE_INDEXES = list(range(17))
 expected_len = 21*3 + 21*3 + 17*4
 
 # 처리 범위 설정
-start_num = 240939270   # 시작 번호 (예시)
-stop_num = 240970090    # 종료 번호 (예시)
+start_num = 240013810   # 시작 번호 (예시)
+stop_num = 240042120    # 종료 번호 (예시)
 step = +10
 
 mp_holistic = mp.solutions.holistic
