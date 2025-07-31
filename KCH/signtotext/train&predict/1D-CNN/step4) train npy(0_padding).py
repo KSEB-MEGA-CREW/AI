@@ -11,16 +11,21 @@ from tensorflow.keras.utils import to_categorical
 from tensorflow.keras.callbacks import EarlyStopping, ReduceLROnPlateau
 from tensorflow.keras.optimizers import Adam
 from bayes_opt import BayesianOptimization
+from sklearn.utils.class_weight import compute_class_weight
+
+import matplotlib
+matplotlib.rcParams['font.family'] = 'Malgun Gothic'  # 윈도우 한글폰트 설정
+matplotlib.rcParams['axes.unicode_minus'] = False
 
 # 🔸 경로 설정
-DATA_PATH = r"C:\cleaned_npy"
-SAVE_DIR = r"C:\KEB_bootcamp\project\AI\KCH\signtotext\train&predict\1D-CNN\models\test2"
+DATA_PATH = r"C:\SoftwareEdu2025\project\Hand_Sound\KCH\signtotext\output_npy\cleaned_npy"
+SAVE_DIR = r"C:\SoftwareEdu2025\project\Hand_Sound\KCH\signtotext\models\test3"
 os.makedirs(SAVE_DIR, exist_ok=True)
 
-REQUIRED_FRAMES = 12
+REQUIRED_FRAMES = 10
 EXPECTED_LEN = 194
-MIN_VALID_FRAMES = 7
-MAX_PADDING_RATIO = 0.44
+MIN_VALID_FRAMES = 6
+MAX_PADDING_RATIO = 0.5
 
 # ===== 데이터 로딩 및 사용자 입력 =====
 label_files = defaultdict(list)
@@ -99,6 +104,12 @@ for label in selected_labels:
 
 X = np.array(sequences)
 y = to_categorical(labels)
+
+# ===== 클래스 가중치 계산 =====
+y_labels = np.array(labels)
+class_weights = compute_class_weight(class_weight="balanced", classes=np.unique(y_labels), y=y_labels)
+class_weight_dict = {i: class_weights[i] for i in range(len(class_weights))}
+
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=42)
 
 # ===== 베이지안 최적화 =====
@@ -154,6 +165,7 @@ model.compile(optimizer=Adam(best['learning_rate']), loss='categorical_crossentr
 
 history = model.fit(X_train, y_train, epochs=1000, batch_size=16,
                     validation_data=(X_test, y_test),
+                    class_weight=class_weight_dict,
                     callbacks=[
                         EarlyStopping(monitor='val_loss', patience=30, restore_best_weights=True),
                         ReduceLROnPlateau(monitor='val_loss', patience=4, factor=0.5)

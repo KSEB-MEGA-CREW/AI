@@ -2,7 +2,7 @@ import os
 import numpy as np
 from collections import Counter
 
-DATA_PATH = r"C:\SoftwareEdu2025\project\Hand_Sound\KCH\signtotext\output_npy\일상생활_학교"
+DATA_PATH = r"C:\SoftwareEdu2025\project\Hand_Sound\KCH\signtotext\output_npy\cleaned_npy"
 frame_lengths = []
 
 for root, dirs, files in os.walk(DATA_PATH):
