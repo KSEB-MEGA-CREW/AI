@@ -2,7 +2,7 @@ import os
 import numpy as np
 
 # 🔧 설정
-target_dir = r"C:\want_output_npy"  # gloss별 폴더들이 들어있는 최상위 디렉토리
+target_dir = r"C:\SoftwareEdu2025\project\Hand_Sound\KCH\signtotext\output_npy\cleaned_npy\좋다1"  # gloss별 폴더들이 들어있는 최상위 디렉토리
 
 file_lengths = []
 

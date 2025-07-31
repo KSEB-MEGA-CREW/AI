@@ -4,9 +4,9 @@ import json
 from tensorflow.keras.models import load_model
 
 # ===== 설정 =====
-MODEL_PATH = r"C:\KEB_bootcamp\project\AI\KCH\signtotext\train&predict\1D-CNN\models\test\gesture_model.h5"
-LABEL_PATH = r"C:\KEB_bootcamp\project\AI\KCH\signtotext\train&predict\1D-CNN\models\test\label_map.json"
-DATA_DIR = r"C:\cleaned_npy\잘하다2"  # 예측할 npy 폴더
+MODEL_PATH = r"C:\SoftwareEdu2025\project\Hand_Sound\KCH\signtotext\models\test2\gesture_model.h5"
+LABEL_PATH = r"C:\SoftwareEdu2025\project\Hand_Sound\KCH\signtotext\models\test2\label_map.json"
+DATA_DIR = r"C:\SoftwareEdu2025\project\Hand_Sound\KCH\signtotext\output_npy\cleaned_npy\좋다1"  # 예측할 npy 폴더
 REQUIRED_FRAMES = 12
 EXPECTED_LEN = 194
 MIN_VALID_FRAMES = 5

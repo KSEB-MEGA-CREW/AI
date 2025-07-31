@@ -16,10 +16,10 @@ def draw_text_korean(frame, text, position, font_size=30, color=(255,255,255)):
     return cv2.cvtColor(np.array(img_pil), cv2.COLOR_RGB2BGR)
 
 # ===== 모델 및 라벨 로딩 =====
-MODEL_PATH = r"C:\KEB_bootcamp\project\AI\KCH\signtotext\train&predict\1D-CNN\models\test2\gesture_model.h5"
-LABEL_PATH = r"C:\KEB_bootcamp\project\AI\KCH\signtotext\train&predict\1D-CNN\models\test2\label_map.json"
+MODEL_PATH = r"C:\SoftwareEdu2025\project\Hand_Sound\KCH\signtotext\models\test3\gesture_model.h5"
+LABEL_PATH = r"C:\SoftwareEdu2025\project\Hand_Sound\KCH\signtotext\models\test3\label_map.json"
 
-model = load_model(MODEL_PATH)
+model = load_model(MODEL_PATH, compile=False)
 with open(LABEL_PATH, "r", encoding="utf-8") as f:
     label_list = json.load(f)
 label_map = {i: label for i, label in enumerate(label_list)}
@@ -32,12 +32,12 @@ holistic = mp_holistic.Holistic(min_detection_confidence=0.7, min_tracking_confi
 # ===== 설정 =====
 POSE_SKIP_INDEXES = set(range(17, 33))  # 하체 제외
 EXPECTED_KEYPOINTS = 194
-BUFFER_SIZE = 12
+BUFFER_SIZE = 10  # ← train 프레임 수와 일치
 CONFIDENCE_THRESHOLD = 0.98
 STABLE_THRESHOLD = 3
 RESET_INTERVAL = 5.0
-MAX_PADDING_RATIO = 0.44
-MIN_VALID_FRAMES = 5
+MAX_PADDING_RATIO = 0.5
+MIN_VALID_FRAMES = 6
 MIN_INTERVAL_BETWEEN_SAME_WORD = 1.0  # 초 단위
 
 # ===== 상태 변수 =====
