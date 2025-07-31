@@ -161,39 +161,6 @@ def data_preprocess(dcnt_limit=None, test_size=None, eval_size=None):
 def data_train():
 
     accelerator = Accelerator()
-    
-    # # --- 1.data Loading and Preparation
-    # # 위에서 정의한 'load_jsonl' 함수를 호출하여 학습 데이터를 로드합니다.
-    # train_data = data_load.load_jsonl(DATA_PATH, limit=9000)
-    # #  Hugging Face의 'Dataset' 객체로 변환하기 위해 데이터를 딕셔너리 형태로 가공합니다.
-    # # 'gloss_id'는 원래 리스트 형태이므로, 각 요소를 공백으로 연결하여 하나의 문자열로 변환합니다.
-    # processed_data = {
-    #     # 'koreanText' 키에 모든 한국어 문장 리스트를 할당합니다.
-    #     "koreanText": [item['koreanText'] for item in train_data],
-    #     # 'gloss_id' 키에 공백으로 합쳐진 수어 단어(gloss) 문자열 리스트를 할당합니다.
-    #     "gloss_id": [" ".join(item['gloss_id']) for item in train_data]
-    # }
-
-    # # 가공된 파이썬 딕셔너리를 Hugging Face의 'Dataset' 객체로 변환합니다.
-    # dataset = Dataset.from_dict(processed_data)
-
-    # # 전체 데이터셋을 훈련용(90%)과 검증용(10%)으로 분리합니다. 'test_size=0.1'은 10%를 검증용으로 사용하겠다는 의미입니다.
-    # dataset = dataset.train_test_split(test_size=0.1, seed=42)
-    # # 분리된 데이터셋에서 훈련용 데이터셋을 'train_dataset' 변수에 할당합니다.
-    # train_validation_set = dataset['train']
-    # # 분리된 데이터셋에서 검증용 데이터셋을 'eval_dataset' 변수에 할당합니다.
-    # test_dataset = dataset['test']
-
-    # final_split = train_validation_set.train_test_split(test_size=1/9, seed=42)
-    # train_dataset = final_split['train']
-    # eval_dataset = final_split['test']
-
-    # # 'print' 함수와 f-string을 사용하여 훈련 데이터셋의 크기를 출력합니다.
-    # print(f"훈련 데이터셋 크기: {len(train_dataset)}")
-    # # 'print' 함수와 f-string을 사용하여 검증 데이터셋의 크기를 출력합니다.
-    # print(f"검증 데이터셋 크기: {len(eval_dataset)}")
-    # print(f"테스트 데이터셋 크기: {len(test_dataset)}")
-
     # # --- 3. 모델, 토크나이저 로드 ---
     # # 'AutoTokenizer.from_pretrained'를 사용해 'MODEL_NAME'에 해당하는 사전 학습된 모델의 토크나이저를 로드합니다.
     # # A function to initialize the model for hyperparameter search.
@@ -210,80 +177,48 @@ def data_train():
     model= t2g_tokenizer.load_model()
     tokenizer = t2g_tokenizer.load_tokenizer()
 
-    # # 데이터셋을 모델 입력 형식에 맞게 토큰화하고 변환하는 함수를 정의합니다.
-    # def preprocess_function(examples):
-    #     # 입력 데이터로 사용할 'koreanText' 컬럼의 텍스트 리스트를 'inputs'에 저장합니다.
-    #     inputs = [ex for ex in examples['koreanText']]
-    #     # 정답(레이블) 데이터로 사용할 'gloss_id' 컬럼의 텍스트 리스트를 'targets'에 저장합니다.
-    #     targets = [ex for ex in examples['gloss_id']]
-        
-    #     # 입력 텍스트('inputs')를 토큰화합니다. 'max_length'로 최대 길이를, 'truncation=True'로 길이 초과 시 자르기를, 'padding="max_length"'로 최대 길이에 맞춰 패딩을 설정합니다.
-    #     model_inputs = tokenizer(inputs, max_length=max_input_length, truncation=True, padding="max_length")
-
-    #     # 'text_target' 인자를 사용하여 타겟(레이블) 텍스트를 토큰화합니다.
-    #     # 이렇게 하면 Seq2Seq 모델의 디코더 입력을 올바르게 처리할 수 있습니다.
-    #     labels = tokenizer(text_target=targets, max_length=max_target_length, truncation=True, padding="max_length")
-
-    #     # 모델이 정답으로 사용할 수 있도록, 토큰화된 레이블의 'input_ids'를 'model_inputs' 딕셔너리의 "labels" 키에 추가합니다.
-    #     model_inputs["labels"] = labels["input_ids"]
-    #     # 전처리된 'model_inputs' 딕셔너리를 반환합니다.
-    #     return model_inputs
-
-    # # Apply the preprocess_function to the entire training dataset using the 'map' function.
-    # # 'batched=True' processes multiple samples at once to speed up the process.
-    # # Use 'remove_columns' to delete the original text columns, keeping only the columns needed by the model.
-    # tokenized_train_dataset = train_dataset.map(preprocess_function, batched=True, remove_columns=train_dataset.column_names)
-    # # print(f"tokenized_train_dataset type : {type(tokenized_train_dataset)}")
-    # # Apply the same preprocessing function to the entire validation dataset.
-    # tokenized_eval_dataset = eval_dataset.map(preprocess_function, batched=True, remove_columns=eval_dataset.column_names)
-
-    # # The KoBART model does not use token_type_ids, so if this column exists, remove it.
-    # # Without this step, the Trainer might pass an unnecessary argument to the model, causing an error.
-    # if 'token_type_ids' in tokenized_train_dataset.column_names:
-    #     # Remove the 'token_type_ids' column from the training dataset.
-    #     tokenized_train_dataset = tokenized_train_dataset.remove_columns(['token_type_ids'])
-    #     # Remove the 'token_type_ids' column from the validation dataset.
-    #     tokenized_eval_dataset = tokenized_eval_dataset.remove_columns(['token_type_ids'])
-
     tokenized_train_dataset, tokenized_eval_dataset, _ = data_preprocess(dcnt_limit=9000, eval_size=0.1)
 
-    # --- 4. 학습 인자(Arguments) 설정 ---
-    # 'Seq2SeqTrainingArguments' 클래스를 사용하여 모델 학습에 필요한 다양한 하이퍼파라미터와 설정을 정의합니다.
+    # --- 4. Set Training Arguments ---
+    # Define various hyperparameters and settings required for model training using the 'Seq2SeqTrainingArguments' class.
     training_args = Seq2SeqTrainingArguments(
-        # 학습 결과물(체크포인트, 모델 등)이 저장될 디렉토리를 지정합니다.
+        # Specify the directory where training outputs (checkpoints, models, etc.) will be saved.
         output_dir=OUTPUT_DIR,
-        # 평가(evaluation)를 언제 수행할지 결정합니다. "epoch"은 한 에포크가 끝날 때마다 평가를 수행하라는 의미입니다.
-        eval_strategy="epoch",
-        # 학습률(learning rate)을 2e-5 (0.00002)로 설정합니다.
+        # Set the evaluation strategy to be performed at regular step intervals.
+        eval_strategy="steps",
+        # # Set the number of steps between each evaluation.
+        # evaluation_steps=1000,
+        # Set the learning rate for the optimizer.
         learning_rate=2e-5,
-        # 훈련 시 각 GPU(device) 당 배치 크기를 8로 설정합니다. GPU 메모리에 따라 조절해야 합니다.
+        # Set the batch size for training on each device (GPU).
         per_device_train_batch_size=16,
-        # 평가 시 각 GPU(device) 당 배치 크기를 8로 설정합니다.
+        # Set the batch size for evaluation on each device (GPU).
         per_device_eval_batch_size=16,
-        # 가중치 감소(weight decay) 정규화 값을 0.01로 설정하여 과적합을 방지합니다.
+        # Set the weight decay rate for regularization to prevent overfitting.
         weight_decay=0.01,
-        # 저장할 최대 체크포인트 수를 3으로 제한합니다. 이 수를 넘으면 가장 오래된 체크포인트가 삭제됩니다.
+        # Limit the total number of saved checkpoints. The oldest ones are deleted first.
         save_total_limit=3,
-        # 전체 훈련 데이터셋을 총 3번 반복하여 학습(에포크 수)하도록 설정합니다.
+        # Set the total number of epochs to train the model.
         num_train_epochs=1000,
-        # 평가 시 'model.generate()'를 사용하여 BLEU, ROUGE 같은 생성 기반 메트릭을 계산할 수 있도록 설정합니다.
+        # Enable prediction with generation to compute metrics like BLEU and ROUGE during evaluation.
         predict_with_generate=True,
-        # 학습 로그가 저장될 디렉토리를 지정합니다.
+        # Specify the directory for storing logs.
         logging_dir=f'{OUTPUT_DIR}/logs',
-        # 100 스텝(step)마다 학습 로그(loss 등)를 기록하도록 설정합니다.
-        logging_steps=50,
-        # 모델 체크포인트를 저장하는 주기를 "epoch"으로 설정하여, 매 에포크마다 저장합니다.
-        save_strategy="epoch",
-        # 훈련이 끝났을 때 가장 성능이 좋았던 모델을 자동으로 로드하도록 설정합니다.
+        # Set the frequency of logging training information (e.g., loss).
+        logging_steps=1000,
+        # Set the checkpoint saving strategy to be based on steps.
+        save_strategy="steps",
+        # Set the number of steps between each checkpoint save. Must be a multiple of evaluation_steps.
+        save_steps=1000,
+        # Load the best model at the end of training based on the specified metric.
         load_best_model_at_end=True,
-        # '최고의 모델'을 결정하는 기준이 될 메트릭을 'eval_loss'(검증 손실)로 지정합니다.
+        # Specify the metric to use for determining the best model.
         metric_for_best_model="eval_loss",
-        # 위에서 설정한 메트릭('eval_loss')의 값이 작을수록 더 좋은 모델임을 명시합니다. (loss는 낮을수록 좋음)
+        # Indicate that a lower value for the metric is better (since it's a loss).
         greater_is_better=False,
-        # Set a seed for reproducible training. This ensures that aspects like model
-        # weight initialization and data shuffling are the same for each run.
+        # Set a random seed for reproducibility of training.
         seed=42,
-        # Gradient Clipping을 활성화합니다. 그래디언트의 총 norm이 1.0을 초과하면 1.0으로 클리핑합니다.
+        # Set the maximum gradient norm for gradient clipping to prevent exploding gradients.
         max_grad_norm=1.0,
     )
 
@@ -333,7 +268,7 @@ def data_train():
         hp_space=hp_space, # 사용자 정의 탐색 공간 전달
         direction="minimize",  # eval_loss를 최소화하는 것이 목표
         backend="optuna",      # 베이지안 최적화를 위해 optuna 사용
-        n_trials=10,           # 20번의 다른 하이퍼파라미터 조합을 시도
+        n_trials=20,           # 20번의 다른 하이퍼파라미터 조합을 시도
         compute_objective=lambda metrics: metrics["eval_loss"], # 최적화 목표 함수
         pruner=optuna.pruners.MedianPruner(
             n_startup_trials=5, # 처음 5개의 trial은 가지치기를 적용하지 않고 끝까지 실행하여 비교 기준이 될 데이터를 축적합니다.
@@ -345,7 +280,10 @@ def data_train():
     # 최적의 하이퍼파라미터를 출력합니다.
     print("최적의 하이퍼파라미터:", best_run.hyperparameters)
 
-    tokenized_train_dataset, tokenized_eval_dataset, tokenized_test_dataset = data_preprocess( test_size=0.1, eval_size=0.1)
+    tokenized_train_dataset, tokenized_eval_dataset, tokenized_test_dataset = data_preprocess(test_size=0.1, eval_size=0.1)
+    
+    # 조기 종료 patience 값을 변수로 저장
+    early_stopping_patience_value = 5
     
     # 전체 데이터 학습
     finally_trainer = Seq2SeqTrainer(
@@ -361,7 +299,7 @@ def data_train():
         # 데이터 콜레이터를 전달하여 배치를 구성합니다.
         data_collator=data_collator,
         # 조기 종료 콜백을 추가합니다.
-        callbacks=[EarlyStoppingCallback(early_stopping_patience=5)]
+        callbacks=[EarlyStoppingCallback(early_stopping_patience=early_stopping_patience_value)]
     )
 
     # 최적의 하이퍼파라미터로 모델을 다시 학습합니다.
@@ -369,7 +307,7 @@ def data_train():
         setattr(finally_trainer.args, n, v)
     
     print("최적의 하이퍼파라미터로 모델 재학습을 시작합니다.")
-    finally_trainer.train()
+    train_result = finally_trainer.train()
 
     # 'print' 함수로 모델 파인튜닝이 완료되었음을 알립니다.
     print("모델 파인튜닝이 완료되었습니다.")
@@ -382,8 +320,49 @@ def data_train():
     # Run prediction on the tokenized test dataset.
     test_results = finally_trainer.predict(tokenized_test_dataset)
     
-    # Print the evaluation metrics from the test results.
-    print(test_results.metrics)
+    # --- 모델 성능 지표 출력 ---
+    print("\n" + "="*50)
+    print(" " * 15 + "모델 성능 요약")
+    print("="*50)
+
+    # 1. 최적 하이퍼파라미터 출력
+    print("\n[최적 하이퍼파라미터]")
+    for param, value in best_run.hyperparameters.items():
+        print(f"- {param}: {value}")
+
+    # 2. 조기 종료 정보 및 학습 에포크
+    # log_history에서 eval_loss가 있는 로그만 필터링
+    eval_logs = [log for log in finally_trainer.state.log_history if 'eval_loss' in log]
+    if eval_logs:
+        # eval_loss가 가장 낮은 로그 찾기
+        best_eval_log = min(eval_logs, key=lambda x: x['eval_loss'])
+        best_epoch = best_eval_log['epoch']
+    else:
+        best_epoch = 'N/A'
+
+    total_epochs_trained = finally_trainer.state.epoch
+
+    print("\n[학습 정보]")
+    print(f"- Early Stopping Patience: {early_stopping_patience_value}")
+    print(f"- 조기 종료된 최적 에포크: {best_epoch if isinstance(best_epoch, str) else f'{best_epoch:.2f}'}")
+    print(f"- 총 학습된 에포크: {total_epochs_trained:.2f}")
+
+    # 3. Loss 값들 출력
+    train_loss = train_result.training_loss
+    best_eval_loss = finally_trainer.state.best_metric
+    test_loss = test_results.metrics.get('test_loss', 'N/A')
+
+    print("\n[Loss 값]")
+    print(f"- 최종 Train Loss: {train_loss:.4f}")
+    print(f"- 최적 Eval Loss: {best_eval_loss:.4f}")
+    print(f"- 최종 Test Loss: {test_loss if isinstance(test_loss, str) else f'{test_loss:.4f}'}")
+
+    # 4. 전체 테스트 결과
+    print("\n[전체 테스트 결과]")
+    for key, value in test_results.metrics.items():
+        print(f"- {key}: {value:.4f}" if isinstance(value, float) else f"- {key}: {value}")
+    
+    print("="*50)
     
     # finally_trainer.model은 accelerate에 의해 래핑된 모델일 수 있으므로,
     # .unwrap_model()을 사용하여 원래의 Hugging Face 모델을 가져옵니다.
@@ -452,4 +431,4 @@ def main():
 if __name__ == '__main__':
     # 'main' 함수를 호출하여 전체 프로세스를 시작합니다.
     data_train()
-    main()
+    # main()
