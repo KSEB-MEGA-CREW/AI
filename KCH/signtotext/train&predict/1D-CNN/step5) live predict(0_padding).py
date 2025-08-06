@@ -33,7 +33,7 @@ holistic = mp_holistic.Holistic(min_detection_confidence=0.7, min_tracking_confi
 POSE_SKIP_INDEXES = set(range(17, 33))  # 하체 제외
 EXPECTED_KEYPOINTS = 194
 BUFFER_SIZE = 10  # ← train 프레임 수와 일치
-CONFIDENCE_THRESHOLD = 0.98
+CONFIDENCE_THRESHOLD = 0.90
 STABLE_THRESHOLD = 3
 RESET_INTERVAL = 5.0
 MAX_PADDING_RATIO = 0.5

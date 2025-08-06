@@ -19,7 +19,7 @@ POSE_INDEXES = list(range(17))
 expected_len = 21*3 + 21*3 + 17*4
 
 # 처리 범위 설정
-start_num = 240939270   # 시작 번호 (예시)
+start_num = 240779230   # 시작 번호 (예시)
 stop_num = 240970090    # 종료 번호 (예시)
 step = +10
 

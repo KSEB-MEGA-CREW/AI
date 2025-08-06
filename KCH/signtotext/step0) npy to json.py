@@ -4,7 +4,7 @@ import os
 
 # 경로 설정
 npy_path = "output_npy/VXPAKOKS240779260_사회1_C.npy"              # npy 파일 경로
-output_dir = "npy to json"              # 저장할 폴더명
+output_dir = r"C:\SoftwareEdu2025\project\Hand_Sound\KCH\signtotext\dataset\npy to json"              # 저장할 폴더명
 os.makedirs(output_dir, exist_ok=True)  # 폴더 없으면 생성
 
 # 랜드마크 이름
