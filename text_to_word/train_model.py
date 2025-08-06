@@ -23,6 +23,10 @@ import util.data_load as data_load
 import config
 import util.t2g_tokenizer as t2g_tokenizer
 import optuna
+import evaluate
+import numpy as np
+import os
+import glob
 
 warnings.filterwarnings("ignore", message="The following device_map keys do not match any submodules in the model:.*")
 
@@ -40,7 +44,7 @@ max_input_length = 128
 # 타겟 시퀀스(수어 단어)의 최대 길이를 128 토큰으로 설정합니다.
 max_target_length = 128
 
-
+# 데이터 전처리 함수
 def data_preprocess(dcnt_limit=None, test_size=None, eval_size=None):
     """
     데이터 전처리 함수입니다.
@@ -84,7 +88,7 @@ def data_preprocess(dcnt_limit=None, test_size=None, eval_size=None):
     # 하이퍼파라미터 탐색 시 데이터셋을 훈련용, 검증용으로 분리합니다.
     if test_size is None and eval_size is None:
         tokenized_train_dataset = dataset.map(preprocess_function, batched=True, remove_columns=train_dataset.column_names)
-        print(f"훈련 데이터셋 크기: {len(train_dataset)}")
+        print(f"훈련 데이터셋 크기: {len(dataset)}")
         return tokenized_train_dataset, None, None
 
     elif eval_size and test_size is None:
@@ -155,225 +159,395 @@ def data_preprocess(dcnt_limit=None, test_size=None, eval_size=None):
         tokenized_test_dataset = test_dataset.map(preprocess_function, batched=True, remove_columns=test_dataset.column_names)
         return tokenized_train_dataset, tokenized_eval_dataset, tokenized_test_dataset
 
-
-
-
+# 학습을 수행하는 함수
+# the function of training the model
 def data_train():
 
     accelerator = Accelerator()
-    # # --- 3. 모델, 토크나이저 로드 ---
-    # # 'AutoTokenizer.from_pretrained'를 사용해 'MODEL_NAME'에 해당하는 사전 학습된 모델의 토크나이저를 로드합니다.
-    # # A function to initialize the model for hyperparameter search.
-    # # This function is called by the Trainer for each trial to get a fresh, untrained model.
-    def model_init():
-        # Load the pre-trained model specified by MODEL_NAME.
-        # This ensures that each hyperparameter search trial starts with the same baseline model.
-        # model= t2g_tokenizer.load_model()
-        print("Initializing a new model for trial...")
-        return t2g_tokenizer.load_model()
     
     # Load the tokenizer associated with the pre-trained model.
     # The tokenizer is loaded only once and reused across all trials.
     model= t2g_tokenizer.load_model()
     tokenizer = t2g_tokenizer.load_tokenizer()
 
-    tokenized_train_dataset, tokenized_eval_dataset, _ = data_preprocess(dcnt_limit=9000, eval_size=0.1)
+    # Load the metric for evaluation
+    # Meteor, BLEU, ROUGE 평가 지표를 계산할 수 있는 객체를 불러옵니다.
+    meteor_metric = evaluate.load("meteor")
+    bleu_metric = evaluate.load("bleu")
+    rouge_metric = evaluate.load("rouge")
 
-    # --- 4. Set Training Arguments ---
-    # Define various hyperparameters and settings required for model training using the 'Seq2SeqTrainingArguments' class.
+    def compute_metrics(eval_preds):
+        """
+        Compute METEOR, BLEU, and ROUGE scores by comparing model predictions to the ground truth.
+        모델의 예측 결과와 실제 정답을 비교하여 METEOR, BLEU, ROUGE 지표를 계산하는 함수입니다.
+        """
+        # Unpack predictions and labels from the EvalPrediction object.
+        preds, labels = eval_preds
+        
+        # Check if predictions are in a tuple and extract the primary output if so.
+        # 예측이 튜플 인지 확인하고, 그렇다면 기본 출력인 첫번째 요소 추출.
+        if isinstance(preds, tuple):
+            preds = preds[0]
+        
+        # Decode the generated token IDs back to text.
+        # Replace -100 (used for padding) with the pad_token_id before decoding.
+        # 디코딩을 하기 전에 -100(padding에 사용한)을 pad_token_id로 대체합니다. 
+        preds = np.where(preds != -100, preds, tokenizer.pad_token_id)
+        decoded_preds = tokenizer.batch_decode(preds, skip_special_tokens=True)
+        
+        # Decode the ground-truth label IDs back to text.
+        labels = np.where(labels != -100, labels, tokenizer.pad_token_id)
+        decoded_labels = tokenizer.batch_decode(labels, skip_special_tokens=True)
+        
+        # To prevent a ZeroDivisionError in the BLEU score calculation,
+        # if a prediction is empty, we replace it with a placeholder.
+        decoded_preds = [pred if pred.strip() else " " for pred in decoded_preds]
+        
+        # Prepare references for metrics - they expect a list of lists.
+        decoded_labels_for_metric = [[label] for label in decoded_labels]
+
+        # Compute the scores.
+        meteor_result = meteor_metric.compute(predictions=decoded_preds, references=decoded_labels_for_metric)
+        bleu_result = bleu_metric.compute(predictions=decoded_preds, references=decoded_labels_for_metric)
+        rouge_result = rouge_metric.compute(predictions=decoded_preds, references=decoded_labels_for_metric)
+        
+        # Combine all metrics into a single dictionary.
+        result = {
+            "meteor": meteor_result["meteor"],
+            "bleu": bleu_result["bleu"]
+        }
+        result.update(rouge_result) # ROUGE returns multiple scores (rouge1, rouge2, etc.)
+        
+        # Add generated text length to the metrics for analysis.
+        prediction_lens = [np.count_nonzero(pred != tokenizer.pad_token_id) for pred in preds]
+        result["gen_len"] = np.mean(prediction_lens)
+        
+        return {k: round(v, 4) for k, v in result.items()}
+
+    # A function to initialize the model for hyperparameter search.
+    def model_init():
+        # Load the pre-trained model specified by MODEL_NAME.
+        print("Initializing a new model for trial...")
+        return t2g_tokenizer.load_model()
+
+    #*******************************************************************
+    #*******************************************************************
+    # --1-- 데이터 로드
+    # Load and preprocess the dataset.
+    tokenized_train_dataset, tokenized_eval_dataset, _ = data_preprocess(dcnt_limit=90, eval_size=0.1)
+    #*******************************************************************
+    #*******************************************************************
+
+    # --2-- 모델 초기화
+    # Initialize the model using Seq2SeqTraingingArguments function 
     training_args = Seq2SeqTrainingArguments(
-        # Specify the directory where training outputs (checkpoints, models, etc.) will be saved.
         output_dir=OUTPUT_DIR,
-        # Set the evaluation strategy to be performed at regular step intervals.
-        eval_strategy="steps",
-        # # Set the number of steps between each evaluation.
-        # evaluation_steps=1000,
-        # Set the learning rate for the optimizer.
+        # Set evaluation strategy to "epoch" to evaluate at the end of each epoch.
+        eval_strategy="epoch",
         learning_rate=2e-5,
-        # Set the batch size for training on each device (GPU).
         per_device_train_batch_size=16,
-        # Set the batch size for evaluation on each device (GPU).
         per_device_eval_batch_size=16,
-        # Set the weight decay rate for regularization to prevent overfitting.
         weight_decay=0.01,
-        # Limit the total number of saved checkpoints. The oldest ones are deleted first.
         save_total_limit=3,
-        # Set the total number of epochs to train the model.
-        num_train_epochs=1000,
-        # Enable prediction with generation to compute metrics like BLEU and ROUGE during evaluation.
+        num_train_epochs=10,
+        # Enable prediction with generation to compute metrics like METEOR.
         predict_with_generate=True,
-        # Specify the directory for storing logs.
         logging_dir=f'{OUTPUT_DIR}/logs',
-        # Set the frequency of logging training information (e.g., loss).
-        logging_steps=1000,
-        # Set the checkpoint saving strategy to be based on steps.
-        save_strategy="steps",
-        # Set the number of steps between each checkpoint save. Must be a multiple of evaluation_steps.
-        save_steps=1000,
-        # Load the best model at the end of training based on the specified metric.
+        logging_steps=5,
+        save_strategy="epoch",
+        # Load the best model at the end based on the METEOR score.
         load_best_model_at_end=True,
-        # Specify the metric to use for determining the best model.
-        metric_for_best_model="eval_loss",
-        # Indicate that a lower value for the metric is better (since it's a loss).
-        greater_is_better=False,
-        # Set a random seed for reproducibility of training.
+        # Specify "meteor" as the metric for finding the best model.
+        metric_for_best_model="meteor",
+        # Indicate that a higher METEOR score is better.
+        greater_is_better=True,
         seed=42,
-        # Set the maximum gradient norm for gradient clipping to prevent exploding gradients.
         max_grad_norm=1.0,
     )
 
-    # 7. 데이터 콜레이터 정의
-    # 'DataCollatorForSeq2Seq' 객체를 생성합니다. 이 객체는 배치 내의 시퀀스들을 동적으로 패딩하여 길이를 맞추는 역할을 합니다.
+    # --- Define Data Collator ---
+    #  data_collator는 데이터셋의 개별 샘플들을 가져와 모델이 학습할 수 있는 형태의 '미니 배치(mini-batch)'로 효율적이고 올바르게 조립해주는 역할을 합니다. 
     data_collator = DataCollatorForSeq2Seq(
-        # 사용할 토크나이저를 지정합니다.
         tokenizer,
-        # 사용할 모델을 지정합니다. (모델 아키텍처에 따라 패딩 방식이 달라질 수 있음)
         model=model
     )
+    
+    # Set patience for early stopping
+    early_stopping_patience_value = 10
 
-    # 8. 트레이너(Trainer) 정의 및 학습 시작
-    # 'Seq2SeqTrainer' 객체를 생성하여 학습 과정을 총괄하도록 합니다.
+    # --- Initialize Trainer ---
+    # 모델의 학습을 수행하기 위해 Seq2SeqTrainer를 초기화합니다.
     trainer = Seq2SeqTrainer(
-        model_init = model_init, # 모델 초기화 함수 전달
-        # 위에서 정의한 학습 관련 인자들을 전달합니다.
-        args = training_args,
-        # 토큰화된 훈련 데이터셋을 전달합니다.
-        train_dataset = tokenized_train_dataset,
-        # 토큰화된 검증 데이터셋을 전달합니다.
-        eval_dataset = tokenized_eval_dataset,
-        # 토크나이저를 전달합니다. (생성된 텍스트를 디코딩하는 데 사용됨)
-        tokenizer = tokenizer,
-        # 데이터 콜레이터를 전달하여 배치를 구성합니다.
-        data_collator=data_collator,
-        # 조기 종료 콜백을 추가합니다.
-        callbacks=[EarlyStoppingCallback(early_stopping_patience=5)]
-    )
-
-    # 'print' 함수로 모델 파인튜닝 시작을 알립니다.
-    print("하이퍼파라미터 탐색을 시작합니다.")
-    # Optuna의 로깅 레벨을 INFO로 설정하여 각 trial의 상세 정보를 출력합니다.
-    optuna.logging.set_verbosity(optuna.logging.INFO)
-
-    # 하이퍼파라미터 탐색 공간을 정의하는 함수입니다.
-    def hp_space(trial: optuna.trial.Trial):
-        return {
-            "learning_rate": trial.suggest_float("learning_rate", 1e-5, 5e-5, log=True),
-            # "num_train_epochs": trial.suggest_int("num_train_epochs", 3, 10),
-            "weight_decay": trial.suggest_float("weight_decay", 0.0, 0.1),
-            "per_device_train_batch_size": trial.suggest_categorical("per_device_train_batch_size", [8, 16])
-        }
-
-    # trainer.hyperparameter_search()를 호출하여 베이지안 최적화를 수행합니다.
-    best_run = trainer.hyperparameter_search(
-        hp_space=hp_space, # 사용자 정의 탐색 공간 전달
-        direction="minimize",  # eval_loss를 최소화하는 것이 목표
-        backend="optuna",      # 베이지안 최적화를 위해 optuna 사용
-        n_trials=20,           # 20번의 다른 하이퍼파라미터 조합을 시도
-        compute_objective=lambda metrics: metrics["eval_loss"], # 최적화 목표 함수
-        pruner=optuna.pruners.MedianPruner(
-            n_startup_trials=5, # 처음 5개의 trial은 가지치기를 적용하지 않고 끝까지 실행하여 비교 기준이 될 데이터를 축적합니다.
-            n_warmup_steps=2, # 각 trial은 최소 2번의 평가(이 코드에서는 2 에포크)를 마친 후에야 가지치기 대상이 됩니다. 초기 학습 단계에서는 성능 변동이 클 수 있기 때문입니다.
-            interval_steps=1# 1번의 평가(1 에포크) 주기마다 가지치기 조건을 확인할지를 결정합니다.
-            )
-    )
-
-    # 최적의 하이퍼파라미터를 출력합니다.
-    print("최적의 하이퍼파라미터:", best_run.hyperparameters)
-
-    tokenized_train_dataset, tokenized_eval_dataset, tokenized_test_dataset = data_preprocess(test_size=0.1, eval_size=0.1)
-    
-    # 조기 종료 patience 값을 변수로 저장
-    early_stopping_patience_value = 5
-    
-    # 전체 데이터 학습
-    finally_trainer = Seq2SeqTrainer(
-        model_init=model_init, # 모델 초기화 함수 전달
-        # 위에서 정의한 학습 관련 인자들을 전달합니다.
+        model_init=model_init,
         args=training_args,
-        # 토큰화된 훈련 데이터셋을 전달합니다.
         train_dataset=tokenized_train_dataset,
-        # 토큰화된 검증 데이터셋을 전달합니다.
         eval_dataset=tokenized_eval_dataset,
-        # 토크나이저를 전달합니다. (생성된 텍스트를 디코딩하는 데 사용됨)
         tokenizer=tokenizer,
-        # 데이터 콜레이터를 전달하여 배치를 구성합니다.
         data_collator=data_collator,
-        # 조기 종료 콜백을 추가합니다.
-        callbacks=[EarlyStoppingCallback(early_stopping_patience=early_stopping_patience_value)]
+        # Pass the compute_metrics function to the trainer.
+        compute_metrics=compute_metrics,
+        # callbacks=[EarlyStoppingCallback(early_stopping_patience=early_stopping_patience_value)]
     )
 
-    # 최적의 하이퍼파라미터로 모델을 다시 학습합니다.
-    for n, v in best_run.hyperparameters.items():
-        setattr(finally_trainer.args, n, v)
-    
-    print("최적의 하이퍼파라미터로 모델 재학습을 시작합니다.")
-    train_result = finally_trainer.train()
-
-    # 'print' 함수로 모델 파인튜닝이 완료되었음을 알립니다.
-    print("모델 파인튜닝이 완료되었습니다.")
-
-    # 모든 프로세스가 이 지점에 도달할 때까지 기다립니다.
-    accelerator.wait_for_everyone()
-
-    print("\n--- 최종 테스트 데이터셋 평가 ---")
-    
-    # Run prediction on the tokenized test dataset.
-    test_results = finally_trainer.predict(tokenized_test_dataset)
-    
-    # --- 모델 성능 지표 출력 ---
     print("\n" + "="*50)
-    print(" " * 15 + "모델 성능 요약")
+    print(" " * 15 + "Starting hyperparameter search.")
+    print(" " * 15 + "하이퍼파라미터 탐색 시작")
     print("="*50)
 
-    # 1. 최적 하이퍼파라미터 출력
+    # --- Hyperparameter Search ---
+    optuna.logging.set_verbosity(optuna.logging.INFO)
+
+    def hp_space(trial: optuna.trial.Trial):
+        return {
+            "learning_rate": trial.suggest_float("learning_rate", 5e-6, 5e-5, log=True),
+            # "num_train_epochs": trial.suggest_int("num_train_epochs", 5, 30),
+            "weight_decay": trial.suggest_float("weight_decay", 0.0, 0.1),
+            "per_device_train_batch_size": trial.suggest_categorical("per_device_train_batch_size", [32])
+        }
+
+    # The objective for hyperparameter search is now to maximize the METEOR score.
+    best_run = trainer.hyperparameter_search(
+        hp_space=hp_space,
+        direction="maximize",  # Maximize the METEOR score
+        backend="optuna",
+        n_trials=1,
+        compute_objective=lambda metrics: metrics["eval_meteor"], # Objective is eval_meteor
+        pruner=optuna.pruners.MedianPruner(
+            n_startup_trials=5,
+            n_warmup_steps=5,
+            interval_steps=1
+        )
+    )
+
+    print("\n" + "="*50)
+    print(" " * 15 +"--Optimal parameters--")
+    print(" " * 15 +"최적의 파라미터:", best_run.hyperparameters)
+    print("="*50)
+
+    #*******************************************************************
+    #*******************************************************************
+    tokenized_train_dataset, tokenized_eval_dataset, tokenized_test_dataset = data_preprocess(dcnt_limit=90, test_size=0.1, eval_size=0.1)
+    #*******************************************************************
+    #*******************************************************************
+
+    # --- Final Training with Best Hyperparameters ---
+    # Re-initialize the model to train all data with aptimal hyperparameters.
+    # 최적의 하이퍼파라미터로 모델이 모든 데이터를 학습 위해 다시 초기화 합니다. 
+    final_trainer = Seq2SeqTrainer(
+        model_init=model_init,
+        args=training_args,
+        train_dataset=tokenized_train_dataset,
+        eval_dataset=tokenized_eval_dataset,
+        tokenizer=tokenizer,
+        data_collator=data_collator,
+        compute_metrics=compute_metrics,
+        # callbacks=[EarlyStoppingCallback(early_stopping_patience=early_stopping_patience_value)]
+    )
+
+    # Set the best hyperparameters found during the search.
+    for n, v in best_run.hyperparameters.items():
+        setattr(final_trainer.args, n, v)
+    
+    print("\n최적의 하이퍼파라미터로 모델 재학습을 시작합니다.\n")
+    train_result = final_trainer.train()
+
+    print("\n모델 파인튜닝이 완료되었습니다\n")
+    accelerator.wait_for_everyone()
+
+    # --- Final Evaluation of the Best Model ---
+    print("\n--- 최종 테스트 데이터셋 평가 (최적 모델) ---")
+    test_results = final_trainer.predict(tokenized_test_dataset)
+    
+    # --- Print Model Performance Summary ---
+    print("\n" + "="*50)
+    print(" " * 15 +"모델 성능 요약")
+    print("="*50)
+
     print("\n[최적 하이퍼파라미터]")
     for param, value in best_run.hyperparameters.items():
         print(f"- {param}: {value}")
 
-    # 2. 조기 종료 정보 및 학습 에포크
-    # log_history에서 eval_loss가 있는 로그만 필터링
-    eval_logs = [log for log in finally_trainer.state.log_history if 'eval_loss' in log]
+    # Find the best epoch based on the highest METEOR score
+    # 최종 학습 모델의 로그(final_trainer.state.log_history)에서 각 요소 중 'eval_meteor' 키가 있는 로그만 가져와 배열에 저장합니다.
+    # From the logs of the final training model (final_trainer.state.log_history), fetch only the logs where each element has the key “eval_meteor” and store them in an array.
+    eval_logs = [log for log in final_trainer.state.log_history if 'eval_meteor' in log]
     if eval_logs:
-        # eval_loss가 가장 낮은 로그 찾기
-        best_eval_log = min(eval_logs, key=lambda x: x['eval_loss'])
+        # Find the log with the highest value based on the 'eval_meteor' key in eval_logs, the list that holds the evaluation elements.
+        # 평가 요소를 보관하는 리스트인 eval_logs에서  'eval_meteor' 키를 기준으로 가장 높은 값을 가진 로그를 찾습니다. 
+        best_eval_log = max(eval_logs, key=lambda x: x['eval_meteor'])
         best_epoch = best_eval_log['epoch']
+        
+        print("\n[체크포인트별 검증(Validation) 결과]")
+        # Loop through the evaluation logs and print results for each checkpoint
+        for log in eval_logs:
+            # Check if 'epoch' and other metrics are in the log
+            if 'epoch' in log and 'eval_loss' in log and 'eval_meteor' in log:
+                # Print the formatted results for the current epoch
+                metric_str = f"Eval Loss = {log['eval_loss']:.4f}, Eval METEOR = {log['eval_meteor']:.4f}"
+                if 'eval_bleu' in log:
+                    metric_str += f", Eval BLEU = {log['eval_bleu']:.4f}"
+                if 'eval_rouge1' in log:
+                    metric_str += f", Eval ROUGE-1 = {log['eval_rouge1']:.4f}"
+                print(f"  - Epoch {log['epoch']:.2f}: {metric_str}")
     else:
         best_epoch = 'N/A'
 
-    total_epochs_trained = finally_trainer.state.epoch
+
+    total_epochs_trained = final_trainer.state.epoch
 
     print("\n[학습 정보]")
-    print(f"- Early Stopping Patience: {early_stopping_patience_value}")
-    print(f"- 조기 종료된 최적 에포크: {best_epoch if isinstance(best_epoch, str) else f'{best_epoch:.2f}'}")
+    # print(f"- Early Stopping Patience: {early_stopping_patience_value}")
+    # print(f"- 조기 종료된 최적 에포크: {best_epoch if isinstance(best_epoch, str) else f'{best_epoch:.2f}'}")
     print(f"- 총 학습된 에포크: {total_epochs_trained:.2f}")
 
-    # 3. Loss 값들 출력
+    # --- Evaluate All Saved Checkpoints on Test Set ---
+    print("\n--- 저장된 모든 체크포인트에 대한 테스트 데이터셋 평가 ---")
+    checkpoint_dirs = sorted(glob.glob(os.path.join(OUTPUT_DIR, "checkpoint-*")))
+    
+    all_checkpoint_metrics = []
+
+    # Iterate through the checkpoint directories and evaluate each checkpoint.
+    # 체크포인트 디렉터리를 순회하며 각 체크포인트에 대한 평가를 진행합니다.
+    for checkpoint_dir in checkpoint_dirs:
+        # Print the start of evaluation for the current checkpoint. 
+        print(f"\n--- {os.path.basename(checkpoint_dir)} 평가 시작 ---")
+        
+        # Initialize epoch_info to 'N/A' as a default value.
+        # epoch 정보를 'N/A'로 초기화 합니다.
+        epoch_info = "N/A"
+
+        # Start a try-except block to handle potential errors gracefully.
+        # 잠재적인 오류를 처리하기 위한 try_except 블록
+        try:
+            # Extract the step number from the checkpoint directory name (e.g., 'checkpoint-56007' -> 56007).
+            # 디렉터리 이름에서 체크포인트의 step number를 추출합니다.
+            checkpoint_step = int(os.path.basename(checkpoint_dir).split('-')[-1])
+            # Iterate through the log history of the final trainer.
+            # final_trainer의 로그를 추출합니다.
+            # This is to find the epoch number corresponding to the current checkpoint.
+            # 현재 체크포인트에 해당하는 epoch 번호를 찾기 위함입니다.
+            for log in final_trainer.state.log_history:
+                # Check if the log entry corresponds to the current checkpoint's step and contains an 'epoch' key.
+                # 로그 항목이 현제 체크포인트와 일치한지 확인하고 'epoch' 키가 있는지 확인
+                if log.get('step') == checkpoint_step and 'epoch' in log:
+                    # If found, format the epoch number to two decimal places and store it.
+                    # 만약 찾았다면, epoch 번호를 포멧하여 저장합니다.
+                    epoch_info = f"{log['epoch']:.2f}"
+                    # Exit the loop once the matching log is found.
+                    break
+        # Catch exceptions if the directory name is not in the expected format.
+        except (ValueError, IndexError):
+            # If an error occurs, epoch_info remains 'N/A'.
+            pass
+
+        # Load the model from the specific checkpoint directory.
+
+        model = AutoModelForSeq2SeqLM.from_pretrained(checkpoint_dir, device_map="auto", ignore_mismatched_sizes=True)
+        
+        # Create a temporary set of training arguments specifically for prediction.
+        # 예측을 위해 임시적인 훈련 인자 집합을 생성합니다.
+        temp_training_args = Seq2SeqTrainingArguments(
+            # Use the same output directory as the main training.
+            output_dir=training_args.output_dir,
+            # Enable prediction using the generate method, which is necessary for text generation tasks.
+            predict_with_generate=True,
+            # Set evaluation strategy to "no" to prevent the trainer from requiring an eval_dataset.
+            # evaluation strategy를 "no"로 설정하여 trainer가 eval_dataset을 요구하지 않도록 합니다.
+            eval_strategy="no",
+            # Use the same evaluation batch size as the main training for consistency.
+            per_device_eval_batch_size=training_args.per_device_eval_batch_size,
+        )
+        
+        # Initialize a temporary Seq2SeqTrainer for running predictions.
+        # 임시 Seq2SeqTrainer를 초기화하여 예측을 실행합니다.
+        temp_trainer = Seq2SeqTrainer(
+            # Pass the loaded model from the checkpoint.
+            model=model,
+            # Use the temporary training arguments.
+            args=temp_training_args,
+            # Pass the tokenizer.
+            tokenizer=tokenizer,
+            # Pass the data collator.
+            data_collator=data_collator,
+            # Pass the function to compute metrics.
+            compute_metrics=compute_metrics,
+        )
+        
+        # Run prediction on the test dataset using the temporary trainer.
+        checkpoint_test_results = temp_trainer.predict(tokenized_test_dataset)
+        # Extract the metrics from the prediction results.
+        metrics = checkpoint_test_results.metrics
+        # Add the checkpoint directory name to the metrics for identification.
+        metrics["checkpoint"] = os.path.basename(checkpoint_dir)
+        # Append the metrics for this checkpoint to the list of all metrics.
+        all_checkpoint_metrics.append(metrics)
+        
+        print("\n" + "="*50)
+        # Print the header for the evaluation results of the current checkpoint.
+        print(f"--- {os.path.basename(checkpoint_dir)} 평가 결과 ---")
+        print("="*50)
+        # Print the epoch number associated with this checkpoint.
+        print(f"- Epoch: {epoch_info}")
+        # Iterate through the computed metrics.
+        for key, value in metrics.items():
+            # Do not print the 'checkpoint' key again as it's already in the header.
+            if key != "checkpoint":
+                # Print each metric's key and value, formatted to 4 decimal places if it's a float.
+                print(f"- {key}: {value:.4f}" if isinstance(value, float) else f"- {key}: {value}")
+
+    if all_checkpoint_metrics:
+            print("\n[체크포인트별 테스트 성능 요약]")
+            for metrics in all_checkpoint_metrics:
+                checkpoint_name = metrics.pop("checkpoint")
+                # Format other metrics for printing
+                metric_str = ", ".join([f"{k.replace('test_', '')}: {v:.4f}" if isinstance(v, float) else f"{k}: {v}" for k, v in metrics.items()])
+                print(f"  - {checkpoint_name}: {metric_str}")
+
     train_loss = train_result.training_loss
-    best_eval_loss = finally_trainer.state.best_metric
-    test_loss = test_results.metrics.get('test_loss', 'N/A')
+    
+    print("\n[최적 체크포인트 성능 요약 (검증 데이터 기준)]")
+    print(f"- 총 학습 Train Loss: {train_loss:.4f}")
 
-    print("\n[Loss 값]")
-    print(f"- 최종 Train Loss: {train_loss:.4f}")
-    print(f"- 최적 Eval Loss: {best_eval_loss:.4f}")
-    print(f"- 최종 Test Loss: {test_loss if isinstance(test_loss, str) else f'{test_loss:.4f}'}")
+    if eval_logs:
+        # Find the training log closest to the best epoch
 
-    # 4. 전체 테스트 결과
-    print("\n[전체 테스트 결과]")
+        train_logs = [log for log in final_trainer.state.log_history if 'loss' in log and 'eval_loss' not in log]
+        train_loss_at_best_epoch = 'N/A'
+        if train_logs:
+            # 최적의 epoch에 가장 가까운 학습 로그를 찾습니다.
+            # Find the training log closest to the best epoch
+            closest_train_log = min(train_logs, key=lambda x: abs(x['epoch'] - best_epoch))
+            train_loss_at_best_epoch = closest_train_log.get('loss')
+
+        eval_loss_at_best_epoch = best_eval_log.get('eval_loss')
+
+        print(f"\n--- 최적 에포크({best_epoch:.2f}) 성능 ---")
+        if isinstance(train_loss_at_best_epoch, float):
+            print(f"- Train Loss: {train_loss_at_best_epoch:.4f}")
+        if eval_loss_at_best_epoch is not None:
+            print(f"- Eval Loss: {eval_loss_at_best_epoch:.4f}")
+        if 'eval_meteor' in best_eval_log:
+            print(f"- Eval METEOR: {best_eval_log['eval_meteor']:.4f}")
+        if 'eval_bleu' in best_eval_log:
+            print(f"- Eval BLEU: {best_eval_log['eval_bleu']:.4f}")
+        if 'eval_rouge1' in best_eval_log:
+            print(f"- Eval ROUGE-1: {best_eval_log['eval_rouge1']:.4f}")
+
+
+    print("\n--- 최종 테스트 성능 (최적 모델) ---")
+    print("[전체 테스트 결과 상세]")
     for key, value in test_results.metrics.items():
         print(f"- {key}: {value:.4f}" if isinstance(value, float) else f"- {key}: {value}")
     
     print("="*50)
     
-    # finally_trainer.model은 accelerate에 의해 래핑된 모델일 수 있으므로,
-    # .unwrap_model()을 사용하여 원래의 Hugging Face 모델을 가져옵니다.
-    unwrapped_model = accelerator.unwrap_model(finally_trainer.model)
-    # 메인 프로세스에서만 모델을 저장하도록 하여, 여러 프로세스가 동시에 쓰는 것을 방지합니다.
+    unwrapped_model = accelerator.unwrap_model(final_trainer.model)
     if accelerator.is_main_process:
-        print(f"학습된 모델을 '{OUTPUT_DIR}'에 저장합니다.")
-        # device_map을 사용하지 않고 저장해야, 나중에 device_map='auto'로 불러올 때 유연합니다.
+        print(f"Saving the trained model to '{OUTPUT_DIR}'")
         unwrapped_model.save_pretrained(OUTPUT_DIR)
         tokenizer.save_pretrained(OUTPUT_DIR)
     # -----------------------------------------------------------
+
 
 # 스크립트의 메인 로직을 포함하는 'main' 함수를 정의합니다.
 def main():
