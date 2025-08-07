@@ -51,7 +51,7 @@ def inference(input :str):
         outputs = trained_model.generate(
             **inputs,
             # decoder_start_token_id = trained_tokenizer.eos_token_id,
-            num_beams=1,
+            num_beams=8,
             do_sample=False,
             max_length=max_target_length
         )

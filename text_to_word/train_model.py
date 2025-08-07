@@ -27,6 +27,9 @@ import evaluate
 import numpy as np
 import os
 import glob
+# Import matplotlib for plotting
+# 플롯팅을 위해 matplotlib를 임포트합니다.
+import matplotlib.pyplot as plt
 
 warnings.filterwarnings("ignore", message="The following device_map keys do not match any submodules in the model:.*")
 
@@ -38,11 +41,282 @@ DATA_PATH = config.DATA_PATH
 # 파인튜닝된 모델과 토크나이저, 그리고 학습 로그가 저장될 디렉토리 경로를 설정합니다.
 OUTPUT_DIR = config.OUTPUT_DIR
 CUSTOM_TOKENIZER = config.CUSTOM_TOKENIZER
+PLOTS_SAVE_DIR = config.PLOTS_SAVE_DIR
 
 # 입력 시퀀스(한국어 문장)의 최대 길이를 128 토큰으로 설정합니다. 이보다 길면 잘라냅니다.
 max_input_length = 128
 # 타겟 시퀀스(수어 단어)의 최대 길이를 128 토큰으로 설정합니다.
 max_target_length = 128
+
+# def save_plots(log_history, all_checkpoint_metrics, output_dir):
+#     """
+#     Parse the training log history and checkpoint metrics, then save plots.
+#     학습 로그 기록과 체크포인트별 지표를 파싱하고 손실 및 평가지표에 대한 플롯을 저장합니다.
+#     """
+#     # Separate logs for training and evaluation
+#     # 학습 및 평가를 위한 로그 분리
+#     train_logs = [log for log in log_history if 'loss' in log and 'eval_loss' not in log]
+#     eval_logs = [log for log in log_history if 'eval_loss' in log]
+
+#     # Extract data from logs
+#     # 로그에서 데이터 추출
+#     train_epochs = [log['epoch'] for log in train_logs] if train_logs else []
+#     train_losses = [log['loss'] for log in train_logs] if train_logs else []
+    
+#     eval_epochs = [log['epoch'] for log in eval_logs] if eval_logs else []
+#     eval_losses = [log['eval_loss'] for log in eval_logs] if eval_logs else []
+#     eval_meteors = [log.get('eval_meteor', 0) for log in eval_logs] if eval_logs else []
+#     eval_bleus = [log.get('eval_bleu', 0) for log in eval_logs] if eval_logs else []
+#     eval_rouge1s = [log.get('eval_rouge1', 0) for log in eval_logs] if eval_logs else []
+
+#     # Extract data from checkpoint metrics for test set
+#     # 테스트 세트에 대한 체크포인트 메트릭에서 데이터 추출
+#     # Ensure metrics are sorted by epoch to draw correct lines
+#     test_metrics = sorted([m for m in all_checkpoint_metrics if 'epoch' in m and isinstance(m['epoch'], (int, float))], key=lambda x: x['epoch'])
+#     test_epochs = [metric['epoch'] for metric in test_metrics]
+#     test_losses = [metric.get('test_loss', 0) for metric in test_metrics]
+#     test_meteors = [metric.get('test_meteor', 0) for metric in test_metrics]
+#     test_bleus = [metric.get('test_bleu', 0) for metric in test_metrics]
+#     test_rouge1s = [metric.get('test_rouge1', 0) for metric in test_metrics]
+
+#     # --- Plot 1: Training, Validation, and Test Loss ---
+#     # --- 플롯 1: 학습, 검증, 및 테스트 손실 ---
+#     plt.figure(figsize=(12, 6))
+#     if train_epochs:
+#         plt.plot(train_epochs, train_losses, label='Training Loss', marker='o', linestyle='--')
+#     if eval_epochs:
+#         plt.plot(eval_epochs, eval_losses, label='Validation Loss', marker='o', linestyle='-')
+#     if test_epochs:
+#         plt.plot(test_epochs, test_losses, label='Test Loss', marker='s', linestyle=':')
+#     plt.title('Training, Validation & Test Loss Over Epochs')
+#     plt.xlabel('Epoch')
+#     plt.ylabel('Loss')
+#     if train_epochs or eval_epochs or test_epochs:
+#         plt.legend()
+#     plt.grid(True)
+#     loss_plot_path = os.path.join(output_dir, 'training_validation_test_loss.png')
+#     plt.savefig(loss_plot_path)
+#     print(f"Loss plot saved to {loss_plot_path}")
+#     plt.close()
+
+#     # --- Plot 2: Evaluation and Test Metrics (METEOR, BLEU, ROUGE) ---
+#     # --- 플롯 2: 검증 및 테스트 지표 (METEOR, BLEU, ROUGE) ---
+#     plt.figure(figsize=(15, 8))
+#     # Plot validation metrics if available
+#     if eval_epochs:
+#         plt.plot(eval_epochs, eval_meteors, label='Validation METEOR', color='green', marker='o', linestyle='-')
+#         plt.plot(eval_epochs, eval_bleus, label='Validation BLEU', color='blue', marker='o', linestyle='-')
+#         plt.plot(eval_epochs, eval_rouge1s, label='Validation ROUGE-1', color='red', marker='o', linestyle='-')
+#     # Plot test metrics if available
+#     if test_epochs:
+#         plt.plot(test_epochs, test_meteors, label='Test METEOR', color='limegreen', marker='s', linestyle='--')
+#         plt.plot(test_epochs, test_bleus, label='Test BLEU', color='deepskyblue', marker='s', linestyle='--')
+#         plt.plot(test_epochs, test_rouge1s, label='Test ROUGE-1', color='tomato', marker='s', linestyle='--')
+    
+#     plt.title('Evaluation & Test Metrics Over Epochs')
+#     plt.xlabel('Epoch')
+#     plt.ylabel('Score')
+#     if eval_epochs or test_epochs:
+#         plt.legend()
+#     plt.grid(True)
+#     metrics_plot_path = os.path.join(output_dir, 'evaluation_test_metrics.png')
+#     plt.savefig(metrics_plot_path)
+#     print(f"Metrics plot saved to {metrics_plot_path}")
+#     plt.close()
+
+def save_plots(log_history, all_checkpoint_metrics, output_dir):
+    """
+    Parse the training log history and checkpoint metrics, then save plots.
+    This version creates 5 separate plots: Loss, BLEU, ROUGE, METEOR, and a combined metrics plot.
+    """
+    os.makedirs(output_dir, exist_ok=True)
+    # Separate logs for training and evaluation
+    train_logs = [log for log in log_history if 'loss' in log and 'eval_loss' not in log]
+    eval_logs = [log for log in log_history if 'eval_loss' in log]
+
+    # Extract data from logs for plotting
+    train_epochs = [log['epoch'] for log in train_logs]
+    train_losses = [log['loss'] for log in train_logs]
+    
+    eval_epochs = [log['epoch'] for log in eval_logs]
+    eval_losses = [log['eval_loss'] for log in eval_logs]
+    eval_meteors = [log.get('eval_meteor') for log in eval_logs]
+    eval_bleus = [log.get('eval_bleu') for log in eval_logs]
+    eval_rouge1s = [log.get('eval_rouge1') for log in eval_logs]
+
+    # Colors for checkpoint lines
+    checkpoint_colors = ['red', 'green', 'purple']
+
+    # --- Plot 1: Loss Plot ---
+    plt.figure(figsize=(12, 8))
+    # Plot training loss over epochs
+    plt.plot(train_epochs, train_losses, label='Training Loss',  linestyle='--')
+    # Plot validation loss over epochs
+    plt.plot(eval_epochs, eval_losses, label='Validation Loss', marker='o', linestyle='-')
+    
+    # Plot test loss for each checkpoint as a horizontal line
+    for i, metrics in enumerate(all_checkpoint_metrics):
+        if 'test_loss' in metrics:
+            # Add a horizontal line for the test loss of the current checkpoint
+            plt.axhline(y=metrics['test_loss'], color=checkpoint_colors[i % len(checkpoint_colors)], linestyle=':', label=f"Test Loss ({metrics.get('checkpoint', 'N/A')})")
+
+    # Set plot title
+    plt.title('Loss Over Epochs')
+    # Set x-axis label
+    plt.xlabel('Epoch')
+    # Set y-axis label
+    plt.ylabel('Loss')
+    # Display the legend
+    plt.legend()
+    # Enable the grid
+    plt.grid(True)
+    # Define the save path for the plot
+    loss_plot_path = os.path.join(output_dir, 'loss_plot.png')
+    # Save the figure
+    plt.savefig(loss_plot_path)
+    # Announce the save location
+    print(f"Loss plot saved to {loss_plot_path}")
+    # Close the plot to free memory
+    plt.close()
+
+    # --- Plot 2: BLEU Score Plot ---
+    plt.figure(figsize=(12, 8))
+    # Note: Training BLEU scores are not logged, only evaluation scores are available.
+    if any(b is not None for b in eval_bleus):
+        # Plot validation BLEU score over epochs
+        plt.plot(eval_epochs, eval_bleus, label='Validation BLEU', marker='o', linestyle='-')
+
+    # Plot test BLEU score for each checkpoint as a horizontal line
+    for i, metrics in enumerate(all_checkpoint_metrics):
+        if 'test_bleu' in metrics:
+            # Add a horizontal line for the test BLEU score
+            plt.axhline(y=metrics['test_bleu'], color=checkpoint_colors[i % len(checkpoint_colors)], linestyle=':', label=f"Test BLEU ({metrics.get('checkpoint', 'N/A')})")
+
+    # Set plot title
+    plt.title('BLEU Score Over Epochs')
+    # Set x-axis label
+    plt.xlabel('Epoch')
+    # Set y-axis label
+    plt.ylabel('BLEU Score')
+    # Display the legend
+    plt.legend()
+    # Enable the grid
+    plt.grid(True)
+    # Define the save path for the plot
+    bleu_plot_path = os.path.join(output_dir, 'bleu_plot.png')
+    # Save the figure
+    plt.savefig(bleu_plot_path)
+    # Announce the save location
+    print(f"BLEU plot saved to {bleu_plot_path}")
+    # Close the plot
+    plt.close()
+
+    # --- Plot 3: ROUGE Score Plot ---
+    plt.figure(figsize=(12, 8))
+    # Note: Training ROUGE scores are not logged, only evaluation scores are available.
+    if any(r is not None for r in eval_rouge1s):
+        # Plot validation ROUGE-1 score over epochs
+        plt.plot(eval_epochs, eval_rouge1s, label='Validation ROUGE-1', marker='o', linestyle='-')
+
+    # Plot test ROUGE score for each checkpoint as a horizontal line
+    for i, metrics in enumerate(all_checkpoint_metrics):
+        if 'test_rouge1' in metrics:
+            # Add a horizontal line for the test ROUGE-1 score
+            plt.axhline(y=metrics['test_rouge1'], color=checkpoint_colors[i % len(checkpoint_colors)], linestyle=':', label=f"Test ROUGE-1 ({metrics.get('checkpoint', 'N/A')})")
+
+    # Set plot title
+    plt.title('ROUGE-1 Score Over Epochs')
+    # Set x-axis label
+    plt.xlabel('Epoch')
+    # Set y-axis label
+    plt.ylabel('ROUGE-1 Score')
+    # Display the legend
+    plt.legend()
+    # Enable the grid
+    plt.grid(True)
+    # Define the save path for the plot
+    rouge_plot_path = os.path.join(output_dir, 'rouge_plot.png')
+    # Save the figure
+    plt.savefig(rouge_plot_path)
+    # Announce the save location
+    print(f"ROUGE plot saved to {rouge_plot_path}")
+    # Close the plot
+    plt.close()
+
+    # --- Plot 4: METEOR Score Plot ---
+    plt.figure(figsize=(12, 8))
+    # Note: Training METEOR scores are not logged, only evaluation scores are available.
+    if any(m is not None for m in eval_meteors):
+        # Plot validation METEOR score over epochs
+        plt.plot(eval_epochs, eval_meteors, label='Validation METEOR', marker='o', linestyle='-')
+
+    # Plot test METEOR score for each checkpoint as a horizontal line
+    for i, metrics in enumerate(all_checkpoint_metrics):
+        if 'test_meteor' in metrics:
+            # Add a horizontal line for the test METEOR score
+            plt.axhline(y=metrics['test_meteor'], color=checkpoint_colors[i % len(checkpoint_colors)], linestyle=':', label=f"Test METEOR ({metrics.get('checkpoint', 'N/A')})")
+
+    # Set plot title
+    plt.title('METEOR Score Over Epochs')
+    # Set x-axis label
+    plt.xlabel('Epoch')
+    # Set y-axis label
+    plt.ylabel('METEOR Score')
+    # Display the legend
+    plt.legend()
+    # Enable the grid
+    plt.grid(True)
+    # Define the save path for the plot
+    meteor_plot_path = os.path.join(output_dir, 'meteor_plot.png')
+    # Save the figure
+    plt.savefig(meteor_plot_path)
+    # Announce the save location
+    print(f"METEOR plot saved to {meteor_plot_path}")
+    # Close the plot
+    plt.close()
+
+    # --- Plot 5: Combined Metrics Plot (BLEU, ROUGE, METEOR) ---
+    plt.figure(figsize=(15, 10))
+    # Plot evaluation metrics if they are available
+    if any(b is not None for b in eval_bleus):
+        plt.plot(eval_epochs, eval_bleus, label='Validation BLEU', marker='o', linestyle='-', color='blue')
+    if any(r is not None for r in eval_rouge1s):
+        plt.plot(eval_epochs, eval_rouge1s, label='Validation ROUGE-1', marker='o', linestyle='-', color='red')
+    if any(m is not None for m in eval_meteors):
+        plt.plot(eval_epochs, eval_meteors, label='Validation METEOR', marker='o', linestyle='-', color='green')
+
+    # # Plot test metrics for each checkpoint as horizontal lines
+    # for i, metrics in enumerate(all_checkpoint_metrics):
+    #     # Get the checkpoint name for the legend
+    #     checkpoint_name = metrics.get('checkpoint', 'N/A')
+    #     # Add horizontal line for test BLEU score
+    #     if 'test_bleu' in metrics:
+    #         plt.axhline(y=metrics['test_bleu'], linestyle=':', color='cyan', label=f"Test BLEU ({checkpoint_name})")
+    #     # Add horizontal line for test ROUGE-1 score
+    #     if 'test_rouge1' in metrics:
+    #         plt.axhline(y=metrics['test_rouge1'], linestyle=':', color='magenta', label=f"Test ROUGE-1 ({checkpoint_name})")
+    #     # Add horizontal line for test METEOR score
+    #     if 'test_meteor' in metrics:
+    #         plt.axhline(y=metrics['test_meteor'], linestyle=':', color='lime', label=f"Test METEOR ({checkpoint_name})")
+
+    # Set plot title
+    plt.title('Combined Evaluation Metrics Over Epochs')
+    # Set x-axis label
+    plt.xlabel('Epoch')
+    # Set y-axis label
+    plt.ylabel('Score')
+    # Display the legend in the best location
+    plt.legend(loc='best')
+    # Enable the grid
+    plt.grid(True)
+    # Define the save path for the plot
+    combined_metrics_plot_path = os.path.join(output_dir, 'combined_metrics_plot.png')
+    # Save the figure
+    plt.savefig(combined_metrics_plot_path)
+    # Announce the save location
+    print(f"Combined metrics plot saved to {combined_metrics_plot_path}")
+    # Close the plot
+    plt.close()
 
 # 데이터 전처리 함수
 def data_preprocess(dcnt_limit=None, test_size=None, eval_size=None):
@@ -196,19 +470,31 @@ def data_train():
         decoded_preds = tokenizer.batch_decode(preds, skip_special_tokens=True)
         
         # Decode the ground-truth label IDs back to text.
+        # Replace -100 with pad_token_id for labels.
         labels = np.where(labels != -100, labels, tokenizer.pad_token_id)
+        # Decode the label IDs to strings.
         decoded_labels = tokenizer.batch_decode(labels, skip_special_tokens=True)
         
         # To prevent a ZeroDivisionError in the BLEU score calculation,
         # if a prediction is empty, we replace it with a placeholder.
-        decoded_preds = [pred if pred.strip() else " " for pred in decoded_preds]
+        # OLD CODE:
+        # decoded_preds = [pred if pred.strip() else " " for pred in decoded_preds]
         
+        # To prevent ZeroDivisionError, replace empty predictions with a placeholder token.
+        # A single space might be tokenized as empty, so we use a specific token like '[PAD]'.
+        decoded_preds = [pred.strip() if pred.strip() else "[PAD]" for pred in decoded_preds]
+        # Also, ensure labels are not empty, which could cause issues with some metrics.
+        decoded_labels = [label.strip() if label.strip() else "[PAD]" for label in decoded_labels]
+
         # Prepare references for metrics - they expect a list of lists.
         decoded_labels_for_metric = [[label] for label in decoded_labels]
 
         # Compute the scores.
+        # Calculate the METEOR score.
         meteor_result = meteor_metric.compute(predictions=decoded_preds, references=decoded_labels_for_metric)
+        # Calculate the BLEU score.
         bleu_result = bleu_metric.compute(predictions=decoded_preds, references=decoded_labels_for_metric)
+        # Calculate the ROUGE score.
         rouge_result = rouge_metric.compute(predictions=decoded_preds, references=decoded_labels_for_metric)
         
         # Combine all metrics into a single dictionary.
@@ -234,7 +520,7 @@ def data_train():
     #*******************************************************************
     # --1-- 데이터 로드
     # Load and preprocess the dataset.
-    tokenized_train_dataset, tokenized_eval_dataset, _ = data_preprocess(dcnt_limit=90, eval_size=0.1)
+    tokenized_train_dataset, tokenized_eval_dataset, _ = data_preprocess(dcnt_limit=9000, eval_size=0.1)
     #*******************************************************************
     #*******************************************************************
 
@@ -272,8 +558,6 @@ def data_train():
         model=model
     )
     
-    # Set patience for early stopping
-    early_stopping_patience_value = 10
 
     # --- Initialize Trainer ---
     # 모델의 학습을 수행하기 위해 Seq2SeqTrainer를 초기화합니다.
@@ -298,35 +582,52 @@ def data_train():
     optuna.logging.set_verbosity(optuna.logging.INFO)
 
     def hp_space(trial: optuna.trial.Trial):
-        return {
+        """
+        Define the hyperparameter search space for Optuna.
+        Optuna를 위한 하이퍼파라미터 탐색 공간을 정의합니다.
+        """
+        print(f"\n--- Starting Trial {trial.number} ---")
+        print("  - Suggested hyperparameters:")
+        batch_size = trial.suggest_categorical("per_device_batch_size", [16, 32])
+
+        # Suggest and define hyperparameters in a dictionary
+        # 하이퍼파라미터를 제안하고 딕셔너리로 정의합니다.
+        # 
+        params = {
             "learning_rate": trial.suggest_float("learning_rate", 5e-6, 5e-5, log=True),
-            # "num_train_epochs": trial.suggest_int("num_train_epochs", 5, 30),
+            "num_train_epochs": trial.suggest_int("num_train_epochs", 50, 100, step=10),
             "weight_decay": trial.suggest_float("weight_decay", 0.0, 0.1),
-            "per_device_train_batch_size": trial.suggest_categorical("per_device_train_batch_size", [32])
+            "per_device_train_batch_size": batch_size,
+            "per_device_eval_batch_size": batch_size,
+            "generation_num_beams": trial.suggest_int( "generation_num_beams", 3, 10)
         }
+
+        for key, value in params.items():
+            print(f"    - {key}: {value}")
+
+        return params
 
     # The objective for hyperparameter search is now to maximize the METEOR score.
     best_run = trainer.hyperparameter_search(
         hp_space=hp_space,
         direction="maximize",  # Maximize the METEOR score
         backend="optuna",
-        n_trials=1,
+        n_trials=50,
         compute_objective=lambda metrics: metrics["eval_meteor"], # Objective is eval_meteor
         pruner=optuna.pruners.MedianPruner(
             n_startup_trials=5,
-            n_warmup_steps=5,
-            interval_steps=1
+            n_warmup_steps=10,
+            interval_steps=3
         )
     )
 
-    print("\n" + "="*50)
-    print(" " * 15 +"--Optimal parameters--")
-    print(" " * 15 +"최적의 파라미터:", best_run.hyperparameters)
-    print("="*50)
+    print("--Optimal parameters--")
+    print("최적의 파라미터:")
 
     #*******************************************************************
     #*******************************************************************
-    tokenized_train_dataset, tokenized_eval_dataset, tokenized_test_dataset = data_preprocess(dcnt_limit=90, test_size=0.1, eval_size=0.1)
+    # tokenized_train_dataset, tokenized_eval_dataset, tokenized_test_dataset = data_preprocess(dcnt_limit=9000, test_size=0.1, eval_size=0.1)
+    tokenized_train_dataset, tokenized_eval_dataset, tokenized_test_dataset = data_preprocess(test_size=0.1, eval_size=0.1)
     #*******************************************************************
     #*******************************************************************
 
@@ -346,8 +647,10 @@ def data_train():
 
     # Set the best hyperparameters found during the search.
     for n, v in best_run.hyperparameters.items():
+        # v += 5 if n == "num_train_epochs" else v
+        print(n + ": " + str(v))
         setattr(final_trainer.args, n, v)
-    
+
     print("\n최적의 하이퍼파라미터로 모델 재학습을 시작합니다.\n")
     train_result = final_trainer.train()
 
@@ -442,7 +745,7 @@ def data_train():
 
         # Load the model from the specific checkpoint directory.
 
-        model = AutoModelForSeq2SeqLM.from_pretrained(checkpoint_dir, device_map="auto", ignore_mismatched_sizes=True)
+        model = AutoModelForSeq2SeqLM.from_pretrained(checkpoint_dir, ignore_mismatched_sizes=True)
         
         # Create a temporary set of training arguments specifically for prediction.
         # 예측을 위해 임시적인 훈련 인자 집합을 생성합니다.
@@ -479,6 +782,7 @@ def data_train():
         metrics = checkpoint_test_results.metrics
         # Add the checkpoint directory name to the metrics for identification.
         metrics["checkpoint"] = os.path.basename(checkpoint_dir)
+        metrics["epoch"] = epoch_info
         # Append the metrics for this checkpoint to the list of all metrics.
         all_checkpoint_metrics.append(metrics)
         
@@ -498,10 +802,16 @@ def data_train():
     if all_checkpoint_metrics:
             print("\n[체크포인트별 테스트 성능 요약]")
             for metrics in all_checkpoint_metrics:
-                checkpoint_name = metrics.pop("checkpoint")
+                checkpoint_name = metrics.get("checkpoint", "N/A")
+                epoch_val = metrics.get("epoch", "N/A")
                 # Format other metrics for printing
                 metric_str = ", ".join([f"{k.replace('test_', '')}: {v:.4f}" if isinstance(v, float) else f"{k}: {v}" for k, v in metrics.items()])
-                print(f"  - {checkpoint_name}: {metric_str}")
+                print(f"  - {checkpoint_name} (Epoch: {epoch_val}): {metric_str}")
+
+    # --- Save Plots ---
+    # Save the training and evaluation plots to the output directory.
+    # 학습 및 평가 플롯을 출력 디렉터리에 저장합니다.
+    save_plots(final_trainer.state.log_history, all_checkpoint_metrics, PLOTS_SAVE_DIR)
 
     train_loss = train_result.training_loss
     
@@ -548,61 +858,8 @@ def data_train():
         tokenizer.save_pretrained(OUTPUT_DIR)
     # -----------------------------------------------------------
 
-
-# 스크립트의 메인 로직을 포함하는 'main' 함수를 정의합니다.
-def main():
-    # 10. 추론(Inference) 예시
-    # 'print' 함수로 추론 테스트 섹션의 시작을 알립니다.
-    print("\n--- 추론 테스트 ---")
-    # device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    # print(f"추론시 사용 장치: {device}")
-
-    # 'AutoTokenizer.from_pretrained'를 사용하여 저장된 토크나이저를 다시 불러옵니다.
-    trained_tokenizer = AutoTokenizer.from_pretrained(OUTPUT_DIR)
-    
-    # 'AutoModelForSeq2SeqLM.from_pretrained'를 사용하여 방금 저장한 파인튜닝된 모델을 다시 불러옵니다.
-    trained_model = AutoModelForSeq2SeqLM.from_pretrained(OUTPUT_DIR, device_map="auto", ignore_mismatched_sizes=True)
-    # trained_model.to(device)
-    trained_model.eval()
-
-    # 번역(gloss 생성)을 테스트할 한국어 문장을 정의합니다.
-    text_to_translate = "안녕하세요 만나서 반갑습니다"
-    # 'print' 함수와 f-string으로 어떤 문장이 입력되었는지 출력합니다.
-    print(f"입력 문장: {text_to_translate}")
-
-    # 입력 문장을 토큰화합니다. 'return_tensors="pt"'는 결과를 파이토치 텐서로 반환하라는 의미입니다. '.to(trained_model.device)'는 모델이 있는 장치(CPU 또는 GPU)로 텐서를 이동시킵니다.
-    inputs = trained_tokenizer(text_to_translate, return_tensors="pt", max_length=max_input_length, truncation=True).to(trained_model.device)
-    
-    # if there are 'token_type_ids in the inputs, remove that
-    if 'token_type_ids' in inputs:
-        inputs.pop('token_type_ids')
-        print(f"input에서 token_type_ids가 제거되었습니다.")
-
-    # 'trained_model.generate()' 메소드를 호출하여 입력 토큰(**inputs)으로부터 새로운 텍스트(gloss)를 생성합니다.
-    # outputs = trained_model.generate(**inputs, max_length=max_target_length)
-    with torch.no_grad():
-        outputs = trained_model.generate(
-            **inputs,
-            # decoder_start_token_id = trained_tokenizer.eos_token_id,
-            num_beams=1,
-            do_sample=False,
-            max_length=max_target_length
-        )
-    
-    # print(f"generated original token: {outputs}")
-
-    # 'trained_tokenizer.decode()'를 사용하여 모델이 생성한 토큰 ID 시퀀스('outputs[0]')를 사람이 읽을 수 있는 문자열로 변환합니다. 'skip_special_tokens=True'는 <pad>, <eos> 같은 특수 토큰을 결과에서 제외합니다.
-    result_gloss = trained_tokenizer.decode(outputs[0], skip_special_tokens=True)
-    
-    # 'print' 함수와 f-string을 사용하여 최종적으로 생성된 gloss 문자열을 출력합니다.
-    print(f"출력 Gloss: {result_gloss}")
-    # 'split()' 메소드를 사용하여 생성된 gloss 문자열을 공백 기준으로 나누어 리스트 형태로 출력합니다.
-    print(f"출력 Gloss (리스트): {result_gloss.split()}")
-
-
 # 이 스크립트 파일이 직접 실행될 때만 'main()' 함수를 호출하도록 하는 파이썬의 표준적인 구문입니다.
 # 다른 스크립트에서 이 파일을 모듈로 임포트할 경우에는 'main()' 함수가 자동으로 실행되지 않습니다.
 if __name__ == '__main__':
     # 'main' 함수를 호출하여 전체 프로세스를 시작합니다.
     data_train()
-    # main()
