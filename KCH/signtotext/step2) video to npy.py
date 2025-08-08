@@ -4,8 +4,8 @@ import numpy as np
 import os
 import time
 
-video_path = 'sample.mp4'
-SAVE_DIR = "dataset"
+video_path = 'VXPAKOKS240779230.mp4'
+SAVE_DIR = r"C:\SoftwareEdu2025\project\Hand_Sound\KCH\signtotext"
 os.makedirs(SAVE_DIR, exist_ok=True)
 
 POSE_INDEXES = list(range(17))  # 0~16만 사용
