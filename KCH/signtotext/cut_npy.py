@@ -4,8 +4,8 @@ import matplotlib.pyplot as plt
 import shutil
 
 # ====== 사용자 설정 ======
-INPUT_DIR = r"C:\SoftwareEdu2025\project\Hand_Sound\KCH\signtotext\want_output_npy"  # 원본 npy 폴더
-OUTPUT_DIR = r"C:\SoftwareEdu2025\project\Hand_Sound\KCH\signtotext\output_npy\cleaned_npy"  # 정제된 결과 저장 폴더
+INPUT_DIR = r"C:\want_npy"  # 원본 npy 폴더
+OUTPUT_DIR = r"C:\cleaned_npy"  # 정제된 결과 저장 폴더
 STD_THRESHOLD = 0.005
 MEAN_THRESHOLD = 0.005  # 평균 기준 (너무 낮으면 튄 것 간과함)
 MIN_VALID_FRAMES = 3  # 최소 유효 프레임 수

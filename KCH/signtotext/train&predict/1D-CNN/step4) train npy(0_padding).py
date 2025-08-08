@@ -18,8 +18,8 @@ matplotlib.rcParams['font.family'] = 'Malgun Gothic'  # 윈도우 한글폰트 �
 matplotlib.rcParams['axes.unicode_minus'] = False
 
 # 🔸 경로 설정
-DATA_PATH = r"C:\SoftwareEdu2025\project\Hand_Sound\KCH\signtotext\want_output_npy"
-SAVE_DIR = r"C:\SoftwareEdu2025\project\Hand_Sound\KCH\signtotext\models\test4"
+DATA_PATH = r"C:\cleaned_npy"
+SAVE_DIR = r"C:\SoftwareEdu2025\project\Hand_Sound\KCH\signtotext\models\test6-1"
 os.makedirs(SAVE_DIR, exist_ok=True)
 
 REQUIRED_FRAMES = 10
