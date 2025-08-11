@@ -26,6 +26,7 @@ Thumbs.db
 
 # 모델 및 훈련 파일
 *.tflite
+*.h5
 *.pb
 *.pkl
 *.onnx

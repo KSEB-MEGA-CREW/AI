@@ -9,7 +9,7 @@ SAVE_DIR = r"C:\SoftwareEdu2025\project\Hand_Sound\KCH\signtotext\None"
 os.makedirs(SAVE_DIR, exist_ok=True)
 
 expected_len = 194
-SEQ_LEN = 10
+SEQ_LEN = 12
 POSE_SKIP_INDEXES = set(range(17, 33))
 
 
