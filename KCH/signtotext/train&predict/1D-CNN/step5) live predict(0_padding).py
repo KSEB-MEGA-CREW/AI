@@ -16,8 +16,8 @@ def draw_text_korean(frame, text, position, font_size=30, color=(255,255,255)):
     return cv2.cvtColor(np.array(img_pil), cv2.COLOR_RGB2BGR)
 
 # ===== 모델 및 라벨 로딩 =====
-MODEL_PATH = r"C:\SoftwareEdu2025\project\Hand_Sound\KCH\signtotext\models\test3\frame_to_gloss_v0.h5"
-LABEL_PATH = r"C:\SoftwareEdu2025\project\Hand_Sound\KCH\signtotext\models\test3\frame_to_gloss_v0.json"
+MODEL_PATH = r"C:\SoftwareEdu2025\project\Hand_Sound\sign-docker-api\model\frame_to_gloss_v0.h5"
+LABEL_PATH = r"C:\SoftwareEdu2025\project\Hand_Sound\sign-docker-api\model\frame_to_gloss_v0.json"
 
 model = load_model(MODEL_PATH, compile=False)
 with open(LABEL_PATH, "r", encoding="utf-8") as f:
