@@ -8,16 +8,18 @@ from collections import defaultdict, Counter
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 # 📂 경로 설정
-root_folder = r"D:"   # 원본 데이터 루트 (json/mp4)
+root_folder = r"D:"  # 원본 데이터 루트 (json/mp4)
 output_dir = r"C:\SoftwareEdu2025\project\Hand_Sound\KCH\signtotext\want_output_npy"
 os.makedirs(output_dir, exist_ok=True)
 
 POSE_INDEXES = list(range(17))
-expected_len = 21*3 + 21*3 + 17*4
+expected_len = 21 * 3 + 21 * 3 + 17 * 4
 BUFFER_FRAMES = 5  # MediaPipe 안정화 프레임
+
 
 def sanitize_filename(name):
     return re.sub(r'[:\/\\?*<>|"]', '_', name)
+
 
 def extract_landmarks(landmarks, dims, idxs=None):
     result = []
@@ -33,6 +35,7 @@ def extract_landmarks(landmarks, dims, idxs=None):
             result.extend(coords)
     return result
 
+
 # 🔍 전체 폴더 내 json/mp4 탐색 (하위 폴더 포함)
 all_json_paths = []
 for dirpath, _, filenames in os.walk(root_folder):
@@ -46,6 +49,7 @@ for dirpath, _, filenames in os.walk(root_folder):
 
 print(f"🔍 총 {len(all_json_paths)}개 JSON/MP4 세트 발견됨")
 
+
 # [1] 데이터 내 전체 라벨 현황 집계 (병렬 집계)
 def count_gloss_ids_worker(json_path):
     counter = Counter()
@@ -55,6 +59,7 @@ def count_gloss_ids_worker(json_path):
             gloss_id = str(gloss['gloss_id']).strip()
             counter[gloss_id] += 1
     return counter
+
 
 label_counter = Counter()
 with ThreadPoolExecutor(max_workers=12) as executor:
@@ -96,7 +101,6 @@ for base_id, json_path, video_path in all_json_paths:
         gloss_id = str(gloss['gloss_id']).strip()
         if gloss_id not in TARGET_LABELS:
             continue
-        # 저장 경로 및 중복 체크는 쓰레드별로 처리
         task_list.append({
             "base_id": base_id,
             "json_path": json_path,
@@ -104,6 +108,7 @@ for base_id, json_path, video_path in all_json_paths:
             "gloss": gloss,
             "fps": fps
         })
+
 
 # [4] 병렬 변환 함수 정의
 def process_one_gloss(task):
@@ -118,7 +123,6 @@ def process_one_gloss(task):
     out_name = f"{base_id}_{gloss_id_clean}.npy"
     out_path = os.path.join(label_dir, out_name)
 
-    # 이미 존재하면 스킵
     if os.path.exists(out_path):
         return (gloss_id, False, out_path)
 
@@ -130,19 +134,18 @@ def process_one_gloss(task):
 
     gloss_keypoints = []
     with mp.solutions.holistic.Holistic(
-        min_detection_confidence=0.7, min_tracking_confidence=0.7
+            min_detection_confidence=0.7, min_tracking_confidence=0.7
     ) as holistic:
         cap = cv2.VideoCapture(video_path)
         cap.set(cv2.CAP_PROP_POS_FRAMES, buffer_start)
         for frame_idx in range(buffer_start, end_frame + 1):
             ret, frame = cap.read()
-            if not ret:
-                break
+            if not ret: break
+
             image_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
             results = holistic.process(image_rgb)
 
-            if frame_idx < start_frame:
-                continue  # 🎯 buffer 프레임은 저장하지 않음
+            if frame_idx < start_frame: continue
 
             lh = extract_landmarks(results.left_hand_landmarks, 3)
             rh = extract_landmarks(results.right_hand_landmarks, 3)
@@ -155,15 +158,25 @@ def process_one_gloss(task):
             gloss_keypoints.append(keypoints)
         cap.release()
 
+    if not gloss_keypoints:
+        return (gloss_id, False, "No keypoints captured")
+
     gloss_keypoints = np.array(gloss_keypoints)
+
+    # ▼▼▼▼▼ [추가] 데이터 저장 전 정규화 단계 ▼▼▼▼▼
+    max_abs = np.max(np.abs(gloss_keypoints))
+    if max_abs > 0:
+        gloss_keypoints = gloss_keypoints / max_abs
+    # ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
+
     np.save(out_path, gloss_keypoints)
     return (gloss_id, True, out_path)
+
 
 # [5] 병렬 변환 실행
 final_counts = Counter()
 with ThreadPoolExecutor(max_workers=6) as executor:
     futures = {}
-    # 라벨별 변환 제한 걸기 위해 인덱스에서 개수 제한
     label_num = {label: 0 for label in TARGET_LABELS}
     for task in task_list:
         gloss_id = str(task["gloss"]['gloss_id']).strip()
@@ -172,13 +185,13 @@ with ThreadPoolExecutor(max_workers=6) as executor:
         label_num[gloss_id] += 1
         futures[executor.submit(process_one_gloss, task)] = gloss_id
 
-    for future in as_completed(futures):
+    for idx, future in enumerate(as_completed(futures)):
         gloss_id, saved, out_path = future.result()
         if saved:
             final_counts[gloss_id] += 1
-            print(f"  ⬇️ 저장: {out_path}")
-        else:
-            print(f"  ⏩ 이미 존재, 건너뜀: {out_path}")
+            print(f"({idx + 1}/{len(futures)}) ⬇️ 저장: {out_path}")
+        # else:
+        # print(f"({idx+1}/{len(futures)}) ⏩ 건너뜀: {out_path}")
 
 print("\n🎉 전체 변환 완료 (저장 기준)")
 print("📊 새로 저장된 파일 개수:")

@@ -6,198 +6,171 @@ from collections import defaultdict
 import matplotlib.pyplot as plt
 from sklearn.model_selection import train_test_split
 from tensorflow.keras.models import Sequential
-from tensorflow.keras.layers import Conv1D, MaxPooling1D, BatchNormalization, Dropout, Flatten, Dense
+from tensorflow.keras.layers import LSTM, Dense, Dropout, BatchNormalization
 from tensorflow.keras.utils import to_categorical
 from tensorflow.keras.callbacks import EarlyStopping, ReduceLROnPlateau
 from tensorflow.keras.optimizers import Adam
-from bayes_opt import BayesianOptimization
 from sklearn.utils.class_weight import compute_class_weight
 
 import matplotlib
-matplotlib.rcParams['font.family'] = 'Malgun Gothic'  # 윈도우 한글폰트 설정
+
+matplotlib.rcParams['font.family'] = 'Malgun Gothic'
 matplotlib.rcParams['axes.unicode_minus'] = False
 
 # 🔸 경로 설정
 DATA_PATH = r"C:\cleaned_npy"
-SAVE_DIR = r"C:\SoftwareEdu2025\project\Hand_Sound\KCH\signtotext\models\test6-1"
+SAVE_DIR = r"C:\SoftwareEdu2025\project\Hand_Sound\KCH\signtotext\models\final_model"
 os.makedirs(SAVE_DIR, exist_ok=True)
 
+# 🔸 전처리 및 모델 설정
 REQUIRED_FRAMES = 10
 EXPECTED_LEN = 194
-MIN_VALID_FRAMES = 6
-MAX_PADDING_RATIO = 0.5
 
-# ===== 데이터 로딩 및 사용자 입력 =====
+# --- 데이터 로딩 (기존 코드와 동일) ---
 label_files = defaultdict(list)
-error_files = []
-
 for root, _, files in os.walk(DATA_PATH):
     for file in files:
         if file.endswith(".npy"):
-            try:
-                if file.startswith("none"):
-                    label = "none"
-                else:
-                    name_split = file.split("_")
-                    label = name_split[1].split(".")[0] if len(name_split) >= 2 else None
-                if label:
-                    label_files[label].append(os.path.join(root, file))
-                else:
-                    error_files.append(os.path.join(root, file))
-            except Exception as e:
-                print(f"❌ 파일명 파싱 오류: {file} ({e})")
-                error_files.append(os.path.join(root, file))
+            label = os.path.basename(root)
+            label_files[label].append(os.path.join(root, file))
 
 label_count_list = sorted(label_files.items(), key=lambda x: len(x[1]), reverse=True)
 print("\n📊 라벨별 npy 개수:")
 for i, (label, files) in enumerate(label_count_list, 1):
     print(f"{i:3d}. {label:15s}: {len(files)}개")
 
-file_counts = [len(files) for files in label_files.values()]
-print(f"\n총 라벨 수: {len(label_files)}개, 총 npy 파일 수: {sum(file_counts)}개")
-if error_files:
-    print(f"\n[⚠️ 파싱 불가 파일]: {error_files}")
-
-# ===== 사용자 입력 =====
+# --- [수정] 사용자 입력 및 데이터 선택 로직 개선 ---
 try:
-    TOP_N = int(input("\n👉 학습할 라벨 개수(예: 30): ").strip())
+    TOP_N = int(input("\n👉 학습할 라벨 개수(예: 30, 'none' 제외): ").strip())
 except Exception:
     TOP_N = 30
 print(f"✅ 학습할 라벨 개수: {TOP_N}")
 
 try:
-    MIN_SAMPLES = int(input("👉 라벨별 최소 데이터 개수 이상만 포함(예: 30): ").strip())
+    # [수정] 변수명을 SAMPLES_PER_CLASS로 변경하여 의미 명확화
+    SAMPLES_PER_CLASS = int(input("👉 라벨별로 사용할 최대 데이터 개수(예: 320): ").strip())
 except Exception:
-    MIN_SAMPLES = 30
-print(f"✅ 라벨별 최소 데이터 개수: {MIN_SAMPLES}")
+    SAMPLES_PER_CLASS = 320
+print(f"✅ 라벨별 최대 데이터 개수: {SAMPLES_PER_CLASS}")
 
-eligible_labels = [label for label, files in label_files.items() if len(files) >= MIN_SAMPLES]
-sorted_labels = sorted([(label, label_files[label]) for label in eligible_labels], key=lambda x: len(x[1]), reverse=True)
+# 'none'을 제외한 라벨들 중에서 빈도수 높은 순으로 선택
+selected_labels = [label for label, files in label_count_list if label != "none"][:TOP_N]
 
-if len(eligible_labels) < TOP_N:
-    raise ValueError(f"⚠️ MIN_SAMPLES={MIN_SAMPLES} 기준을 만족하는 라벨이 {len(eligible_labels)}개뿐입니다.")
+# [수정] 'none' 클래스가 존재하면 무조건 학습에 포함
+if "none" in label_files:
+    selected_labels.append("none")
+    print("✅ 'none' 클래스를 학습에 자동으로 추가합니다.")
 
-selected_labels = [label for label, files in sorted_labels[:TOP_N]]
 label_dict = {label: i for i, label in enumerate(selected_labels)}
-print(f"\n✅ 최종 학습 라벨 목록 ({TOP_N}개):\n{selected_labels}")
+print(f"\n✅ 최종 학습 라벨 목록 ({len(selected_labels)}개):\n{selected_labels}")
 
-# ===== 데이터 전처리 =====
+
+# --- [수정] 데이터 증강 함수 정의 ---
+def augment_sequence(sequence, noise_level=0.005):
+    """ 데이터에 작은 노이즈를 추가하여 증강합니다. """
+    noise = np.random.normal(0, noise_level, sequence.shape)
+    return sequence + noise
+
+
+# --- 데이터 전처리 (샘플링 방식 및 증강 적용) ---
 sequences, labels = [], []
 for label in selected_labels:
-    files = random.sample(label_files[label], MIN_SAMPLES)
-    for file in files:
-        seq = np.load(file)
-        if seq.shape[0] < MIN_VALID_FRAMES:
-            continue
+    all_files = label_files[label]
+
+    # [수정] SAMPLES_PER_CLASS만큼 데이터를 사용하도록 로직 변경
+    if len(all_files) > SAMPLES_PER_CLASS:
+        files_to_use = random.sample(all_files, SAMPLES_PER_CLASS)
+    else:
+        files_to_use = all_files
+
+    for file_path in files_to_use:
+        seq = np.load(file_path)
+
+        # 프레임 길이 맞추기 (Padding / Truncating)
         if seq.shape[0] < REQUIRED_FRAMES:
             pad = np.zeros((REQUIRED_FRAMES - seq.shape[0], EXPECTED_LEN))
             seq = np.vstack([seq, pad])
         else:
             seq = seq[:REQUIRED_FRAMES]
-        if np.sum(seq == 0) / seq.size > MAX_PADDING_RATIO:
-            continue
-        max_abs = np.max(np.abs(seq))
-        if max_abs > 0:
-            seq = seq / max_abs
+
+        # 원본 데이터 추가
         sequences.append(seq)
         labels.append(label_dict[label])
 
+        # [수정] 데이터 증강: 데이터가 부족한 클래스는 2배로 증강 (none 제외)
+        if label != "none" and len(all_files) < SAMPLES_PER_CLASS:
+            sequences.append(augment_sequence(seq))
+            labels.append(label_dict[label])
+
 X = np.array(sequences)
-y = to_categorical(labels)
+y = to_categorical(np.array(labels))
 
-# ===== 클래스 가중치 계산 =====
-y_labels = np.array(labels)
-class_weights = compute_class_weight(class_weight="balanced", classes=np.unique(y_labels), y=y_labels)
-class_weight_dict = {i: class_weights[i] for i in range(len(class_weights))}
+print(f"\n📈 전처리 후 총 데이터 개수: {len(X)}개")
+print(f"   데이터 형태: {X.shape}")
+print(f"   라벨 형태: {y.shape}")
 
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=42)
+# --- 클래스 가중치 계산 및 데이터 분할 ---
+y_indices = np.argmax(y, axis=1)
+class_weights = compute_class_weight(class_weight="balanced", classes=np.unique(y_indices), y=y_indices)
+class_weight_dict = {i: w for i, w in enumerate(class_weights)}
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.25, random_state=42, stratify=y)
 
-# ===== 베이지안 최적화 =====
-def cnn_eval(learning_rate, dropout1, dropout2):
+
+# --- [수정] 모델 구조 변경 (LSTM 기반) ---
+# 1D CNN도 좋지만, 시계열 데이터에는 LSTM/GRU가 더 강력한 성능을 보이는 경우가 많습니다.
+def create_model(learning_rate=0.001, dropout_rate=0.4):
     model = Sequential([
-        Conv1D(128, 7, activation='relu', padding='same', input_shape=(REQUIRED_FRAMES, EXPECTED_LEN)),
+        LSTM(64, return_sequences=True, input_shape=(REQUIRED_FRAMES, EXPECTED_LEN)),
+        Dropout(dropout_rate),
+        LSTM(128, return_sequences=False),
+        Dropout(dropout_rate),
+        Dense(128, activation='relu'),
         BatchNormalization(),
-        MaxPooling1D(2),
-        Dropout(dropout1),
-        Conv1D(256, 5, activation='relu', padding='same'),
-        BatchNormalization(),
-        MaxPooling1D(2),
-        Dropout(dropout2),
-        Flatten(),
-        Dense(512, activation='relu'),
-        Dropout(dropout1),
+        Dropout(dropout_rate),
         Dense(y.shape[1], activation='softmax')
     ])
     model.compile(optimizer=Adam(learning_rate), loss='categorical_crossentropy', metrics=['accuracy'])
-    model.fit(X_train, y_train, epochs=60, batch_size=16,
-              validation_data=(X_test, y_test),
-              callbacks=[
-                  EarlyStopping(monitor='val_loss', patience=15, restore_best_weights=True),
-                  ReduceLROnPlateau(monitor='val_loss', patience=4)
-              ],
-              verbose=0)
-    return model.evaluate(X_test, y_test, verbose=0)[1]
+    return model
 
-bo = BayesianOptimization(
-    f=cnn_eval,
-    pbounds={'learning_rate': (1e-4, 3e-3), 'dropout1': (0.1, 0.5), 'dropout2': (0.1, 0.5)},
-    random_state=42
-)
-bo.maximize(init_points=5, n_iter=10)
 
-# ===== 최적 파라미터로 모델 학습 =====
-best = bo.max['params']
-model = Sequential([
-    Conv1D(128, 7, activation='relu', padding='same', input_shape=(REQUIRED_FRAMES, EXPECTED_LEN)),
-    BatchNormalization(),
-    MaxPooling1D(2),
-    Dropout(best['dropout1']),
-    Conv1D(256, 5, activation='relu', padding='same'),
-    BatchNormalization(),
-    MaxPooling1D(2),
-    Dropout(best['dropout2']),
-    Flatten(),
-    Dense(512, activation='relu'),
-    Dropout(best['dropout1']),
-    Dense(y.shape[1], activation='softmax')
-])
-model.compile(optimizer=Adam(best['learning_rate']), loss='categorical_crossentropy', metrics=['accuracy'])
+# --- 모델 학습 ---
+# 베이지안 최적화는 시간이 매우 오래 걸리므로, 우선 검증된 값으로 학습을 시도합니다.
+model = create_model()
+model.summary()
 
-history = model.fit(X_train, y_train, epochs=1000, batch_size=16,
+history = model.fit(X_train, y_train, epochs=200, batch_size=32,
                     validation_data=(X_test, y_test),
                     class_weight=class_weight_dict,
                     callbacks=[
-                        EarlyStopping(monitor='val_loss', patience=30, restore_best_weights=True),
-                        ReduceLROnPlateau(monitor='val_loss', patience=4, factor=0.5)
+                        EarlyStopping(monitor='val_accuracy', patience=20, restore_best_weights=True),
+                        ReduceLROnPlateau(monitor='val_loss', patience=7, factor=0.5)
                     ])
 
-# ===== 모델 및 라벨 저장 =====
+# --- 모델 및 라벨 저장 ---
 model.save(os.path.join(SAVE_DIR, "gesture_model.h5"))
 label_list = [label for label, _ in sorted(label_dict.items(), key=lambda x: x[1])]
 with open(os.path.join(SAVE_DIR, "label_map.json"), "w", encoding="utf-8") as f:
     json.dump(label_list, f, ensure_ascii=False)
 
-# ===== 성능 시각화 =====
+# --- 성능 시각화 및 결과 확인 (기존 코드와 동일) ---
+# ... (이하 시각화 및 테스트 코드) ...
 plt.figure(figsize=(12, 5))
 plt.subplot(1, 2, 1)
 plt.plot(history.history['accuracy'], label='훈련 정확도')
 plt.plot(history.history['val_accuracy'], label='검증 정확도')
-plt.title("정확도 변화"); plt.xlabel("Epoch"); plt.ylabel("정확도"); plt.legend()
-
+plt.title("정확도 변화");
+plt.xlabel("Epoch");
+plt.ylabel("정확도");
+plt.legend()
 plt.subplot(1, 2, 2)
 plt.plot(history.history['loss'], label='훈련 손실')
 plt.plot(history.history['val_loss'], label='검증 손실')
-plt.title("손실 변화"); plt.xlabel("Epoch"); plt.ylabel("손실"); plt.legend()
-plt.tight_layout()
+plt.title("손실 변화");
+plt.xlabel("Epoch");
+plt.ylabel("손실");
+plt.legend()
+plt.tight_layout();
 plt.show()
 
-# ===== 예측 결과 확인 (최대 20개)
-y_pred = model.predict(X_test)
-y_pred_label = np.argmax(y_pred, axis=1)
-y_true_label = np.argmax(y_test, axis=1)
-accuracy = np.mean(y_pred_label == y_true_label)
-print(f"\n[OFFLINE TEST] 모델 Test셋 정확도: {accuracy:.4f}")
-for i in range(min(20, len(y_true_label))):
-    gt = label_list[y_true_label[i]]
-    pred = label_list[y_pred_label[i]]
-    print(f"[{i:02d}] 실제: {gt:10s} | 예측: {pred:10s}")
+loss, acc = model.evaluate(X_test, y_test)
+print(f"\n최종 검증 정확도: {acc:.4f}")
