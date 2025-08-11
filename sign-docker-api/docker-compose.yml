@@ -1,0 +1,11 @@
+version: "3.9"
+services:
+  sign-model-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./model:/model   # 모델 교체 시 편리
+    restart: unless-stopped
