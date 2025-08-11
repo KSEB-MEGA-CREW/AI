@@ -1,21 +1,33 @@
-# 'json' 라이브러리를 임포트합니다.
-import json
-# 'torch' 라이브러리를 임포트합니다.
-import torch
+# 사용자의 데이터 로드 함수를 임포트합니다.
+import os
+import sys
 # 'transformers' 라이브러리에서 필요한 클래스들을 임포트합니다.
 from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
 # 'datasets' 라이브러리에서 'Dataset' 클래스를 임포트합니다.
 from datasets import Dataset
-# 사용자의 데이터 로드 함수를 임포트합니다.
-import util.data_load as data_load
-import os
-import sys
 
 # Add the parent directory ('text_to_word') to the system path
 # to allow importing modules from it (e.g., config.py).
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
-import config
+try:
+    # This import works when the script is imported as a module.
+    from . import data_load
+    # This import works when the script is imported as a module.
+    from .. import config
+except ImportError:
+    # This import works when the script is run directly.
+    import sys
+    # This import works when the script is run directly.
+    import os
+    # Get the absolute path of the current script.
+    __current_path = os.path.dirname(os.path.abspath(__file__))
+    # Add the parent directory (text_to_word) to the system path.
+    sys.path.append(os.path.dirname(__current_path))
+    # Add the project root directory (KSEB) to the system path.
+    sys.path.append(os.path.dirname(os.path.dirname(__current_path)))
+    # Import the data_load module using an absolute path.
+    from util import data_load
+    # Import the config module using an absolute path.
+    import config
 
 # 1. 기본 변수 및 데이터 로드
 # 원본 사전 학습 모델
@@ -118,89 +130,79 @@ def  adding_new_token(MODEL_NAME = MODEL_NAME, data = full_data):
 
 def load_model(model_dir=CUSTOM_TOKENIZER, base_model_name=MODEL_NAME):
     """
-    If a model exists in the specified directory (model_dir), it will load that model and torqueizer; 
+    If a model exists in the specified directory (model_dir), it will load that model ; 
     if  does not exist, it will load the default model (base_model_name) from the Hugging Face hub.
     
     Args:
-        model_dir (str): Locally saved model and torquenizer paths
+        model_dir (str): Locally saved modelpaths
         base_model_name (str): Default model name for the Hugging Face hub
 
     Returns:
-        tuple: (loaded models, loaded torquers)
+        model: loaded models
 
     
     (korean)
     
-    지정된 디렉토리(model_dir)에 모델이 존재하면 해당 모델과 토크나이저를 로드하고,
+    지정된 디렉토리(model_dir)에 모델이 존재하면 해당 모델을 로드하고,
     존재하지 않으면 Hugging Face 허브에서 기본 모델(base_model_name)을 로드합니다.
 
     매게변수:
-        model_dir (str): 로컬에 저장된 모델 및 토크나이저 경로
+        model_dir (str): 로컬에 저장된 모델 경로
         base_model_name (str): Hugging Face 허브의 기본 모델 이름
 
     반환값:
-        tuple: (로드된 모델, 로드된 토크나이저)
+        모델: 로드된 모델
     """
     # 지정된 디렉토리가 존재하고, 내부에 파일이 있는지 확인합니다.
     if os.path.exists(model_dir) and os.listdir(model_dir):
         # 디렉토리가 존재하면, 로컬에 저장된 모델과 토크나이저를 로드합니다.
         print(f"'{model_dir}'에서 로컬 모델과 토크나이저를 로드합니다.")
         model = AutoModelForSeq2SeqLM.from_pretrained(model_dir)
-        tokenizer = AutoTokenizer.from_pretrained(model_dir)
     else:
         # 디렉토리가 없거나 비어있으면, Hugging Face 허브에서 기본 모델을 로드합니다.
         print(f"'{model_dir}'에 로컬 모델이 없습니다. Hugging Face 허브에서 '{base_model_name}'을(를) 로드합니다.")
         model = AutoModelForSeq2SeqLM.from_pretrained(base_model_name)
-        tokenizer = AutoTokenizer.from_pretrained(base_model_name)
     
     # 로드된 모델과 토크나이저를 반환합니다.
-    return model, tokenizer
+    return model
 
+def load_tokenizer(tokenizer_dir=CUSTOM_TOKENIZER, base_tokenizer_name=MODEL_NAME):
+    """
+    If a tokenizer exists in the specified directory (tokenizer_dir), it will load that tokenizer; 
+    if  does not exist, it will load the default tokenizer (base_tokenizer_name) from the Hugging Face hub.
+    
+    Args:
+        tokenizer_dir (str): Locally saved tokenizer and torquenizer paths
+        base_tokenizer_name (str): Default tokenizer name for the Hugging Face hub
 
+    Returns:
+        tokenizer: loaded tokenizer
 
+    
+    (korean)
+    
+    지정된 디렉토리(tokenizer_dir)에 토크나이저이 존재하면 해당 토크나이저를 로드하고,
+    존재하지 않으면 Hugging Face 허브에서 기본 토크나이저(base_tokenizer_name)을 로드합니다.
 
-# # 2. 데이터셋에서 모든 고유한 gloss_id 추출
-# print("데이터셋에서 고유한 gloss_id를 추출합니다...")
-# all_glosses = set()
-# for item in full_data:
-#     # item['gloss_id']가 리스트 형태이므로, set에 각 요소를 추가
-#     all_glosses.update(item['gloss_id'])
+    매게변수:
+        tokenizer_dir (str): 로컬에 저장된 토크나이저 경로
+        base_tokenizer_name (str): Hugging Face 허브의 기본 토크나이저 이름
 
-# # 집합(set)을 다시 리스트로 변환
-# unique_gloss_tokens = list(all_glosses)
-# print(f"총 {len(unique_gloss_tokens)}개의 고유한 gloss를 찾았습니다.")
-# print(f"샘플 gloss: {unique_gloss_tokens[:10]}") # 처음 10개만 샘플로 출력
-
-# # 3. 기존 토크나이저와 모델 로드
-# print(f"'{MODEL_NAME}'에서 기존 토크나이저와 모델을 로드합니다.")
-# tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
-# model = AutoModelForSeq2SeqLM.from_pretrained(MODEL_NAME)
-
-# # 토큰 추가 전 어휘 사전 크기 확인
-# original_vocab_size = len(tokenizer)
-# print(f"토큰 추가 전 어휘 사전 크기: {original_vocab_size}")
-
-# # 4. 토크나이저에 새로운 토큰 추가
-# print("토크나이저에 새로운 gloss 토큰을 추가합니다...")
-# # .add_tokens()는 실제로 어휘 사전에 추가된 새로운 토큰의 수를 반환합니다.
-# num_added_toks = tokenizer.add_tokens(unique_gloss_tokens)
-# print(f"총 {num_added_toks}개의 새로운 토큰이 추가되었습니다.")
-
-# # 토큰 추가 후 어휘 사전 크기 확인
-# new_vocab_size = len(tokenizer)
-# print(f"토큰 추가 후 어휘 사전 크기: {new_vocab_size}")
-
-# # 5. 모델의 임베딩 레이어 크기 조절 (⭐ 매우 중요)
-# # 토크나이저의 어휘 사전이 늘어났으므로, 모델의 토큰 임베딩 레이어 크기도 맞춰주어야 합니다.
-# # 그렇지 않으면 학습 시 에러가 발생합니다.
-# print("모델의 토큰 임베딩 레이어 크기를 조절합니다...")
-# model.resize_token_embeddings(new_vocab_size)
-
-# # 6. 업데이트된 토크나이저와 모델 저장
-# print(f"업데이트된 토크나이저와 모델을 '{CUSTOM_TOKENIZER}'에 저장합니다.")
-# tokenizer.save_pretrained(CUSTOM_TOKENIZER)
-# model.save_pretrained(CUSTOM_TOKENIZER)
-# print("저장 완료!")
+    반환값:
+        토크나이저: 로드된 토크나이저
+    """
+    # 지정된 디렉토리가 존재하고, 내부에 파일이 있는지 확인합니다.
+    if os.path.exists(tokenizer_dir) and os.listdir(tokenizer_dir):
+        # 디렉토리가 존재하면, 로컬에 저장된 모델과 토크나이저를 로드합니다.
+        print(f"'{tokenizer_dir}'에서 로컬 모델과 토크나이저를 로드합니다.")
+        tokenizer = AutoTokenizer.from_pretrained(tokenizer_dir)
+    else:
+        # 디렉토리가 없거나 비어있으면, Hugging Face 허브에서 기본 모델을 로드합니다.
+        print(f"'{tokenizer_dir}'에 로컬 모델이 없습니다. Hugging Face 허브에서 '{base_tokenizer_name}'을(를) 로드합니다.")
+        tokenizer = AutoTokenizer.from_pretrained(base_tokenizer_name)
+    
+    # 로드된 모델과 토크나이저를 반환합니다.
+    return tokenizer
 
 
 if __name__ == "__main__":
