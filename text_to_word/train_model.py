@@ -1,3 +1,16 @@
+import os
+# # TensorFlow와 PyTorch 간의 GPU 메모리 충돌을 방지하기 위해 TensorFlow의 메모리 증가를 활성화합니다.
+# # 이렇게 하면 TensorFlow가 시작 시 모든 GPU 메모리를 할당하는 것을 막아 PyTorch와 함께 원활하게 실행될 수 있습니다.
+# os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
+# try:
+#     import tensorflow as tf
+#     gpus = tf.config.experimental.list_physical_devices('GPU')
+#     if gpus:
+#         for gpu in gpus:
+#             tf.config.experimental.set_memory_growth(gpu, True)
+# except (ImportError, RuntimeError):
+#     pass
+
 import warnings
 # 'torch' 라이브러리를 임포트합니다. 파이토치는 딥러닝 모델을 구축하고 학습시키는 데 사용되는 핵심 프레임워크입니다.
 import torch
@@ -25,7 +38,6 @@ import util.t2g_tokenizer as t2g_tokenizer
 import optuna
 import evaluate
 import numpy as np
-import os
 import glob
 # Import matplotlib for plotting
 # 플롯팅을 위해 matplotlib를 임포트합니다.
@@ -48,93 +60,21 @@ max_input_length = 128
 # 타겟 시퀀스(수어 단어)의 최대 길이를 128 토큰으로 설정합니다.
 max_target_length = 128
 
-# def save_plots(log_history, all_checkpoint_metrics, output_dir):
-#     """
-#     Parse the training log history and checkpoint metrics, then save plots.
-#     학습 로그 기록과 체크포인트별 지표를 파싱하고 손실 및 평가지표에 대한 플롯을 저장합니다.
-#     """
-#     # Separate logs for training and evaluation
-#     # 학습 및 평가를 위한 로그 분리
-#     train_logs = [log for log in log_history if 'loss' in log and 'eval_loss' not in log]
-#     eval_logs = [log for log in log_history if 'eval_loss' in log]
-
-#     # Extract data from logs
-#     # 로그에서 데이터 추출
-#     train_epochs = [log['epoch'] for log in train_logs] if train_logs else []
-#     train_losses = [log['loss'] for log in train_logs] if train_logs else []
-    
-#     eval_epochs = [log['epoch'] for log in eval_logs] if eval_logs else []
-#     eval_losses = [log['eval_loss'] for log in eval_logs] if eval_logs else []
-#     eval_meteors = [log.get('eval_meteor', 0) for log in eval_logs] if eval_logs else []
-#     eval_bleus = [log.get('eval_bleu', 0) for log in eval_logs] if eval_logs else []
-#     eval_rouge1s = [log.get('eval_rouge1', 0) for log in eval_logs] if eval_logs else []
-
-#     # Extract data from checkpoint metrics for test set
-#     # 테스트 세트에 대한 체크포인트 메트릭에서 데이터 추출
-#     # Ensure metrics are sorted by epoch to draw correct lines
-#     test_metrics = sorted([m for m in all_checkpoint_metrics if 'epoch' in m and isinstance(m['epoch'], (int, float))], key=lambda x: x['epoch'])
-#     test_epochs = [metric['epoch'] for metric in test_metrics]
-#     test_losses = [metric.get('test_loss', 0) for metric in test_metrics]
-#     test_meteors = [metric.get('test_meteor', 0) for metric in test_metrics]
-#     test_bleus = [metric.get('test_bleu', 0) for metric in test_metrics]
-#     test_rouge1s = [metric.get('test_rouge1', 0) for metric in test_metrics]
-
-#     # --- Plot 1: Training, Validation, and Test Loss ---
-#     # --- 플롯 1: 학습, 검증, 및 테스트 손실 ---
-#     plt.figure(figsize=(12, 6))
-#     if train_epochs:
-#         plt.plot(train_epochs, train_losses, label='Training Loss', marker='o', linestyle='--')
-#     if eval_epochs:
-#         plt.plot(eval_epochs, eval_losses, label='Validation Loss', marker='o', linestyle='-')
-#     if test_epochs:
-#         plt.plot(test_epochs, test_losses, label='Test Loss', marker='s', linestyle=':')
-#     plt.title('Training, Validation & Test Loss Over Epochs')
-#     plt.xlabel('Epoch')
-#     plt.ylabel('Loss')
-#     if train_epochs or eval_epochs or test_epochs:
-#         plt.legend()
-#     plt.grid(True)
-#     loss_plot_path = os.path.join(output_dir, 'training_validation_test_loss.png')
-#     plt.savefig(loss_plot_path)
-#     print(f"Loss plot saved to {loss_plot_path}")
-#     plt.close()
-
-#     # --- Plot 2: Evaluation and Test Metrics (METEOR, BLEU, ROUGE) ---
-#     # --- 플롯 2: 검증 및 테스트 지표 (METEOR, BLEU, ROUGE) ---
-#     plt.figure(figsize=(15, 8))
-#     # Plot validation metrics if available
-#     if eval_epochs:
-#         plt.plot(eval_epochs, eval_meteors, label='Validation METEOR', color='green', marker='o', linestyle='-')
-#         plt.plot(eval_epochs, eval_bleus, label='Validation BLEU', color='blue', marker='o', linestyle='-')
-#         plt.plot(eval_epochs, eval_rouge1s, label='Validation ROUGE-1', color='red', marker='o', linestyle='-')
-#     # Plot test metrics if available
-#     if test_epochs:
-#         plt.plot(test_epochs, test_meteors, label='Test METEOR', color='limegreen', marker='s', linestyle='--')
-#         plt.plot(test_epochs, test_bleus, label='Test BLEU', color='deepskyblue', marker='s', linestyle='--')
-#         plt.plot(test_epochs, test_rouge1s, label='Test ROUGE-1', color='tomato', marker='s', linestyle='--')
-    
-#     plt.title('Evaluation & Test Metrics Over Epochs')
-#     plt.xlabel('Epoch')
-#     plt.ylabel('Score')
-#     if eval_epochs or test_epochs:
-#         plt.legend()
-#     plt.grid(True)
-#     metrics_plot_path = os.path.join(output_dir, 'evaluation_test_metrics.png')
-#     plt.savefig(metrics_plot_path)
-#     print(f"Metrics plot saved to {metrics_plot_path}")
-#     plt.close()
-
 def save_plots(log_history, all_checkpoint_metrics, output_dir):
     """
     Parse the training log history and checkpoint metrics, then save plots.
     This version creates 5 separate plots: Loss, BLEU, ROUGE, METEOR, and a combined metrics plot.
     """
+    # Create the output directory if it doesn't exist.
+    # 출력 디렉터리가 없으면 생성합니다.
     os.makedirs(output_dir, exist_ok=True)
-    # Separate logs for training and evaluation
+    # Separate logs for training and evaluation.
+    # 훈련 및 평가 로그를 분리합니다.
     train_logs = [log for log in log_history if 'loss' in log and 'eval_loss' not in log]
     eval_logs = [log for log in log_history if 'eval_loss' in log]
 
-    # Extract data from logs for plotting
+    # Extract data from logs for plotting.
+    # 플로팅을 위해 로그에서 데이터를 추출합니다.
     train_epochs = [log['epoch'] for log in train_logs]
     train_losses = [log['loss'] for log in train_logs]
     
@@ -144,140 +84,207 @@ def save_plots(log_history, all_checkpoint_metrics, output_dir):
     eval_bleus = [log.get('eval_bleu') for log in eval_logs]
     eval_rouge1s = [log.get('eval_rouge1') for log in eval_logs]
 
-    # Colors for checkpoint lines
+    # Colors for checkpoint lines.
+    # 체크포인트 라인에 대한 색상입니다.
     checkpoint_colors = ['red', 'green', 'purple']
 
     # --- Plot 1: Loss Plot ---
+    # --- 플롯 1: 손실 플롯 ---
     plt.figure(figsize=(12, 8))
-    # Plot training loss over epochs
+    # Plot training loss over epochs.
+    # 에포크에 따른 훈련 손실을 플로팅합니다.
     plt.plot(train_epochs, train_losses, label='Training Loss',  linestyle='--')
-    # Plot validation loss over epochs
+    # Plot validation loss over epochs.
+    # 에포크에 따른 검증 손실을 플로팅합니다.
     plt.plot(eval_epochs, eval_losses, label='Validation Loss', marker='o', linestyle='-')
     
-    # Plot test loss for each checkpoint as a horizontal line
+    # Plot test loss for each checkpoint as a horizontal line.
+    # 각 체크포인트에 대한 테스트 손실을 수평선으로 플로팅합니다.
     for i, metrics in enumerate(all_checkpoint_metrics):
+        # Check if 'test_loss' exists in metrics.
+        # 메트릭에 'test_loss'가 있는지 확인합니다.
         if 'test_loss' in metrics:
-            # Add a horizontal line for the test loss of the current checkpoint
-            plt.axhline(y=metrics['test_loss'], color=checkpoint_colors[i % len(checkpoint_colors)], linestyle=':', label=f"Test Loss ({metrics.get('checkpoint', 'N/A')})")
+            # Add a horizontal line for the test loss of the current checkpoint.
+            # 현재 체크포인트의 테스트 손실에 대한 수평선을 추가합니다.
+            plt.axhline(y=metrics['test_loss'], color=checkpoint_colors[i % len(checkpoint_colors)], linestyle=':', label=f"Test Loss ({metrics.get('checkpoint', 'N/A')}) epoch: {metrics.get('epoch', 'N/A')}" )
 
-    # Set plot title
+    # Set plot title.
+    # 플롯 제목을 설정합니다.
     plt.title('Loss Over Epochs')
-    # Set x-axis label
+    # Set x-axis label.
+    # x축 레이블을 설정합니다.
     plt.xlabel('Epoch')
-    # Set y-axis label
+    # Set y-axis label.
+    # y축 레이블을 설정합니다.
     plt.ylabel('Loss')
-    # Display the legend
+    # Display the legend.
+    # 범례를 표시합니다.
     plt.legend()
-    # Enable the grid
+    # Enable the grid.
+    # 그리드를 활성화합니다.
     plt.grid(True)
-    # Define the save path for the plot
+    # Define the save path for the plot.
+    # 플롯의 저장 경로를 정의합니다.
     loss_plot_path = os.path.join(output_dir, 'loss_plot.png')
-    # Save the figure
+    # Save the figure.
+    # 그림을 저장합니다.
     plt.savefig(loss_plot_path)
-    # Announce the save location
+    # Announce the save location.
+    # 저장 위치를 알립니다.
     print(f"Loss plot saved to {loss_plot_path}")
-    # Close the plot to free memory
+    # Close the plot to free memory.
+    # 메모리를 확보하기 위해 플롯을 닫습니다.
     plt.close()
 
     # --- Plot 2: BLEU Score Plot ---
+    # --- 플롯 2: BLEU 점수 플롯 ---
     plt.figure(figsize=(12, 8))
     # Note: Training BLEU scores are not logged, only evaluation scores are available.
+    # 참고: 훈련 BLEU 점수는 기록되지 않으며, 평가 점수만 사용할 수 있습니다.
     if any(b is not None for b in eval_bleus):
-        # Plot validation BLEU score over epochs
+        # Plot validation BLEU score over epochs.
+        # 에포크에 따른 검증 BLEU 점수를 플로팅합니다.
         plt.plot(eval_epochs, eval_bleus, label='Validation BLEU', marker='o', linestyle='-')
 
-    # Plot test BLEU score for each checkpoint as a horizontal line
+    # Plot test BLEU score for each checkpoint as a horizontal line.
+    # 각 체크포인트에 대한 테스트 BLEU 점수를 수평선으로 플로팅합니다.
     for i, metrics in enumerate(all_checkpoint_metrics):
+        # Check if 'test_bleu' exists in metrics.
+        # 메트릭에 'test_bleu'가 있는지 확인합니다.
         if 'test_bleu' in metrics:
-            # Add a horizontal line for the test BLEU score
-            plt.axhline(y=metrics['test_bleu'], color=checkpoint_colors[i % len(checkpoint_colors)], linestyle=':', label=f"Test BLEU ({metrics.get('checkpoint', 'N/A')})")
+            # Add a horizontal line for the test BLEU score.
+            # 테스트 BLEU 점수에 대한 수평선을 추가합니다.
+            plt.axhline(y=metrics['test_bleu'], color=checkpoint_colors[i % len(checkpoint_colors)], linestyle=':', label=f"Test BLEU ({metrics.get('checkpoint', 'N/A')} epoch: {metrics.get('epoch', 'N/A')}")
 
-    # Set plot title
+    # Set plot title.
+    # 플롯 제목을 설정합니다.
     plt.title('BLEU Score Over Epochs')
-    # Set x-axis label
+    # Set x-axis label.
+    # x축 레이블을 설정합니다.
     plt.xlabel('Epoch')
-    # Set y-axis label
+    # Set y-axis label.
+    # y축 레이블을 설정합니다.
     plt.ylabel('BLEU Score')
-    # Display the legend
+    # Display the legend.
+    # 범례를 표시합니다.
     plt.legend()
-    # Enable the grid
+    # Enable the grid.
+    # 그리드를 활성화합니다.
     plt.grid(True)
-    # Define the save path for the plot
+    # Define the save path for the plot.
+    # 플롯의 저장 경로를 정의합니다.
     bleu_plot_path = os.path.join(output_dir, 'bleu_plot.png')
-    # Save the figure
+    # Save the figure.
+    # 그림을 저장합니다.
     plt.savefig(bleu_plot_path)
-    # Announce the save location
+    # Announce the save location.
+    # 저장 위치를 알립니다.
     print(f"BLEU plot saved to {bleu_plot_path}")
-    # Close the plot
+    # Close the plot.
+    # 플롯을 닫습니다.
     plt.close()
 
     # --- Plot 3: ROUGE Score Plot ---
+    # --- 플롯 3: ROUGE 점수 플롯 ---
     plt.figure(figsize=(12, 8))
     # Note: Training ROUGE scores are not logged, only evaluation scores are available.
+    # 참고: 훈련 ROUGE 점수는 기록되지 않으며, 평가 점수만 사용할 수 있습니다.
     if any(r is not None for r in eval_rouge1s):
-        # Plot validation ROUGE-1 score over epochs
+        # Plot validation ROUGE-1 score over epochs.
+        # 에포크에 따른 검증 ROUGE-1 점수를 플로팅합니다.
         plt.plot(eval_epochs, eval_rouge1s, label='Validation ROUGE-1', marker='o', linestyle='-')
 
-    # Plot test ROUGE score for each checkpoint as a horizontal line
+    # Plot test ROUGE score for each checkpoint as a horizontal line.
+    # 각 체크포인트에 대한 테스트 ROUGE 점수를 수평선으로 플로팅합니다.
     for i, metrics in enumerate(all_checkpoint_metrics):
+        # Check if 'test_rouge1' exists in metrics.
+        # 메트릭에 'test_rouge1'이 있는지 확인합니다.
         if 'test_rouge1' in metrics:
-            # Add a horizontal line for the test ROUGE-1 score
-            plt.axhline(y=metrics['test_rouge1'], color=checkpoint_colors[i % len(checkpoint_colors)], linestyle=':', label=f"Test ROUGE-1 ({metrics.get('checkpoint', 'N/A')})")
+            # Add a horizontal line for the test ROUGE-1 score.
+            # 테스트 ROUGE-1 점수에 대한 수평선을 추가합니다.
+            plt.axhline(y=metrics['test_rouge1'], color=checkpoint_colors[i % len(checkpoint_colors)], linestyle=':', label=f"Test ROUGE-1 ({metrics.get('checkpoint', 'N/A')} epoch: {metrics.get('epoch', 'N/A')}")
 
-    # Set plot title
+    # Set plot title.
+    # 플롯 제목을 설정합니다.
     plt.title('ROUGE-1 Score Over Epochs')
-    # Set x-axis label
+    # Set x-axis label.
+    # x축 레이블을 설정합니다.
     plt.xlabel('Epoch')
-    # Set y-axis label
+    # Set y-axis label.
+    # y축 레이블을 설정합니다.
     plt.ylabel('ROUGE-1 Score')
-    # Display the legend
+    # Display the legend.
+    # 범례를 표시합니다.
     plt.legend()
-    # Enable the grid
+    # Enable the grid.
+    # 그리드를 활성화합니다.
     plt.grid(True)
-    # Define the save path for the plot
+    # Define the save path for the plot.
+    # 플롯의 저장 경로를 정의합니다.
     rouge_plot_path = os.path.join(output_dir, 'rouge_plot.png')
-    # Save the figure
+    # Save the figure.
+    # 그림을 저장합니다.
     plt.savefig(rouge_plot_path)
-    # Announce the save location
+    # Announce the save location.
+    # 저장 위치를 알립니다.
     print(f"ROUGE plot saved to {rouge_plot_path}")
-    # Close the plot
+    # Close the plot.
+    # 플롯을 닫습니다.
     plt.close()
 
     # --- Plot 4: METEOR Score Plot ---
+    # --- 플롯 4: METEOR 점수 플롯 ---
     plt.figure(figsize=(12, 8))
     # Note: Training METEOR scores are not logged, only evaluation scores are available.
+    # 참고: 훈련 METEOR 점수는 기록되지 않으며, 평가 점수만 사용할 수 있습니다.
     if any(m is not None for m in eval_meteors):
-        # Plot validation METEOR score over epochs
+        # Plot validation METEOR score over epochs.
+        # 에포크에 따른 검증 METEOR 점수를 플로팅합니다.
         plt.plot(eval_epochs, eval_meteors, label='Validation METEOR', marker='o', linestyle='-')
 
-    # Plot test METEOR score for each checkpoint as a horizontal line
+    # Plot test METEOR score for each checkpoint as a horizontal line.
+    # 각 체크포인트에 대한 테스트 METEOR 점수를 수평선으로 플로팅합니다.
     for i, metrics in enumerate(all_checkpoint_metrics):
+        # Check if 'test_meteor' exists in metrics.
+        # 메트릭에 'test_meteor'가 있는지 확인합니다.
         if 'test_meteor' in metrics:
-            # Add a horizontal line for the test METEOR score
-            plt.axhline(y=metrics['test_meteor'], color=checkpoint_colors[i % len(checkpoint_colors)], linestyle=':', label=f"Test METEOR ({metrics.get('checkpoint', 'N/A')})")
+            # Add a horizontal line for the test METEOR score.
+            # 테스트 METEOR 점수에 대한 수평선을 추가합니다.
+            plt.axhline(y=metrics['test_meteor'], color=checkpoint_colors[i % len(checkpoint_colors)], linestyle=':', label=f"Test METEOR ({metrics.get('checkpoint', 'N/A')}) epoch: {metrics.get('epoch', 'N/A')}")
 
-    # Set plot title
+    # Set plot title.
+    # 플롯 제목을 설정합니다.
     plt.title('METEOR Score Over Epochs')
-    # Set x-axis label
+    # Set x-axis label.
+    # x축 레이블을 설정합니다.
     plt.xlabel('Epoch')
-    # Set y-axis label
+    # Set y-axis label.
+    # y축 레이블을 설정합니다.
     plt.ylabel('METEOR Score')
-    # Display the legend
+    # Display the legend.
+    # 범례를 표시합니다.
     plt.legend()
-    # Enable the grid
+    # Enable the grid.
+    # 그리드를 활성화합니다.
     plt.grid(True)
-    # Define the save path for the plot
+    # Define the save path for the plot.
+    # 플롯의 저장 경로를 정의합니다.
     meteor_plot_path = os.path.join(output_dir, 'meteor_plot.png')
-    # Save the figure
+    # Save the figure.
+    # 그림을 저장합니다.
     plt.savefig(meteor_plot_path)
-    # Announce the save location
+    # Announce the save location.
+    # 저장 위치를 알립니다.
     print(f"METEOR plot saved to {meteor_plot_path}")
-    # Close the plot
+    # Close the plot.
+    # 플롯을 닫습니다.
     plt.close()
 
     # --- Plot 5: Combined Metrics Plot (BLEU, ROUGE, METEOR) ---
+    # --- 플롯 5: 결합된 메트릭 플롯 (BLEU, ROUGE, METEOR) ---
     plt.figure(figsize=(15, 10))
-    # Plot evaluation metrics if they are available
+    # Plot evaluation metrics if they are available.
+    # 사용 가능한 경우 평가 메트릭을 플로팅합니다.
     if any(b is not None for b in eval_bleus):
         plt.plot(eval_epochs, eval_bleus, label='Validation BLEU', marker='o', linestyle='-', color='blue')
     if any(r is not None for r in eval_rouge1s):
@@ -285,38 +292,125 @@ def save_plots(log_history, all_checkpoint_metrics, output_dir):
     if any(m is not None for m in eval_meteors):
         plt.plot(eval_epochs, eval_meteors, label='Validation METEOR', marker='o', linestyle='-', color='green')
 
-    # # Plot test metrics for each checkpoint as horizontal lines
-    # for i, metrics in enumerate(all_checkpoint_metrics):
-    #     # Get the checkpoint name for the legend
-    #     checkpoint_name = metrics.get('checkpoint', 'N/A')
-    #     # Add horizontal line for test BLEU score
-    #     if 'test_bleu' in metrics:
-    #         plt.axhline(y=metrics['test_bleu'], linestyle=':', color='cyan', label=f"Test BLEU ({checkpoint_name})")
-    #     # Add horizontal line for test ROUGE-1 score
-    #     if 'test_rouge1' in metrics:
-    #         plt.axhline(y=metrics['test_rouge1'], linestyle=':', color='magenta', label=f"Test ROUGE-1 ({checkpoint_name})")
-    #     # Add horizontal line for test METEOR score
-    #     if 'test_meteor' in metrics:
-    #         plt.axhline(y=metrics['test_meteor'], linestyle=':', color='lime', label=f"Test METEOR ({checkpoint_name})")
-
-    # Set plot title
+    # Set plot title.
+    # 플롯 제목을 설정합니다.
     plt.title('Combined Evaluation Metrics Over Epochs')
-    # Set x-axis label
+    # Set x-axis label.
+    # x축 레이블을 설정합니다.
     plt.xlabel('Epoch')
-    # Set y-axis label
+    # Set y-axis label.
+    # y축 레이블을 설정합니다.
     plt.ylabel('Score')
-    # Display the legend in the best location
+    # Display the legend in the best location.
+    # 가장 좋은 위치에 범례를 표시합니다.
     plt.legend(loc='best')
-    # Enable the grid
+    # Enable the grid.
+    # 그리드를 활성화합니다.
     plt.grid(True)
-    # Define the save path for the plot
+    # Define the save path for the plot.
+    # 플롯의 저장 경로를 정의합니다.
     combined_metrics_plot_path = os.path.join(output_dir, 'combined_metrics_plot.png')
-    # Save the figure
+    # Save the figure.
+    # 그림을 저장합니다.
     plt.savefig(combined_metrics_plot_path)
-    # Announce the save location
+    # Announce the save location.
+    # 저장 위치를 알립니다.
     print(f"Combined metrics plot saved to {combined_metrics_plot_path}")
-    # Close the plot
+    # Close the plot.
+    # 플롯을 닫습니다.
     plt.close()
+
+
+    # for i, metrics in enumerate(all_checkpoint_metrics):
+    #     # Check if 'test_meteor' exists in metrics.
+    #     # 메트릭에 'test_meteor'가 있는지 확인합니다.
+    #     if 'test_meteor' in metrics:
+    #         # Add a horizontal line for the test METEOR score.
+    #         # 테스트 METEOR 점수에 대한 수평선을 추가합니다.
+    #         plt.axhline(y=metrics['test_meteor'], color=checkpoint_colors[i % len(checkpoint_colors)], linestyle=':', label=f"Test METEOR ({metrics.get('checkpoint', 'N/A')})")
+    # --- New Plot: Checkpoint Test Metrics (Grouped Bar Chart) ---
+    # --- 새로운 플롯: 체크포인트 테스트 메트릭 (그룹화된 막대 차트) ---
+    if all_checkpoint_metrics:
+        # Extract checkpoint names for x-axis labels.
+        # x축 레이블의 체크포인트 이름을 추출합니다.
+        width = 0.2
+        fig, axes = plt.subplots(nrows=3, ncols=1, figsize=(10, 4))
+        fig.suptitle('Test scores for each checkpoints', fontsize=16)
+        for i, metrics in enumerate(all_checkpoint_metrics):
+            if 'test_loss' in metrics:
+                loss = axes[i].bar(i - width, metrics['test_loss'], width, label='Test Loss', color='lightblue')
+                axes[i].bar_label(loss, fmt='%.4f')
+            if 'test_bleu' in metrics:
+                blue = axes[i].bar(i, metrics['test_bleu'], width, label='Test BLEU', color='orange')
+                axes[i].bar_label(blue, fmt='%.4f')
+            if 'test_rouge1' in metrics:
+                rouge = axes[i].bar(i + width, metrics['test_rouge1'], width, label='Test ROUGE-1', color='green')
+                axes[i].bar_label(rouge, fmt='%.4f')
+            if 'test_meteor' in metrics:
+                meteor = axes[i].bar(i + 2 * width, metrics['test_meteor'], width, label='Test METEOR', color='purple')
+                axes[i].bar_label(meteor, fmt='%.4f')
+            axes[i].set_title(f'Test score of {metrics.get("checkpoint", "N/A")} epoch: {metrics.get("epoch", "N/A")}')
+            axes[i].set_ylabel('Score')
+            axes[i].grid(True)
+            axes[i].legend()
+        fig.tight_layout()
+        test_plot_path = os.path.join(output_dir, 'test_score_plot.png')
+        plt.savefig(test_plot_path)
+        plt.close(fig)
+
+
+    # --- New Plot: Checkpoint Test Loss (Bar Chart) ---
+    # --- 새로운 플롯: 체크포인트 테스트 손실 (막대 차트) ---
+    # if all_checkpoint_metrics:
+    #     # Extract checkpoint names for x-axis labels.
+    #     # x축 레이블의 체크포인트 이름을 추출합니다.
+    #     checkpoint_names = [m.get('checkpoint', f'CP {i}') for i, m in enumerate(all_checkpoint_metrics)]
+    #     # Extract test loss values.
+    #     # 테스트 손실 값을 추출합니다.
+    #     test_losses = [m.get('test_loss') for m in all_checkpoint_metrics]
+
+    #     # Plot bars for test loss if data is available.
+    #     # 데이터가 있는 경우 테스트 손실에 대한 막대를 플로팅합니다.
+    #     if any(l is not None for l in test_losses):
+    #         # Create a new figure.
+    #         # 새 그림을 만듭니다.
+    #         plt.figure(figsize=(12, 7))
+    #         # Create bars for test losses.
+    #         # 테스트 손실에 대한 막대를 만듭니다.
+    #         bars = plt.bar(checkpoint_names, [l or 0 for l in test_losses], color='coral')
+            
+    #         # Set the x-axis label.
+    #         # x축 레이블을 설정합니다.
+    #         plt.xlabel('Checkpoint')
+    #         # Set the y-axis label.
+    #         # y축 레이블을 설정합니다.
+    #         plt.ylabel('Loss')
+    #         # Set the plot title.
+    #         # 플롯 제목을 설정합니다.
+    #         plt.title('Test Loss per Checkpoint')
+    #         # Rotate x-axis labels for better readability.
+    #         # 가독성을 높이기 위해 x축 레이블을 회전합니다.
+    #         plt.xticks(rotation=45, ha="right")
+    #         # Enable the y-axis grid.
+    #         # y축 그리드를 활성화합니다.
+    #         plt.grid(True, axis='y', linestyle='--', alpha=0.7)
+            
+    #         # Add labels on top of bars.
+    #         # 막대 위에 레이블을 추가합니다.
+    #         plt.bar_label(bars, fmt='%.4f')
+            
+    #         # Adjust layout to prevent labels from overlapping.
+    #         # 레이블이 겹치지 않도록 레이아웃을 조정합니다.
+    #         plt.tight_layout()
+
+    #         # Save the figure.
+    #         # 그림을 저장합니다.
+    #         checkpoint_loss_path = os.path.join(output_dir, 'checkpoint_test_loss_bar.png')
+    #         plt.savefig(checkpoint_loss_path)
+    #         print(f"Checkpoint loss bar plot saved to {checkpoint_loss_path}")
+    #         # Close the plot to free up memory.
+    #         # 메모리를 확보하기 위해 플롯을 닫습니다.
+    #         plt.close()
 
 # 데이터 전처리 함수
 def data_preprocess(dcnt_limit=None, test_size=None, eval_size=None):
@@ -595,7 +689,7 @@ def data_train():
         # 
         params = {
             "learning_rate": trial.suggest_float("learning_rate", 5e-6, 5e-5, log=True),
-            "num_train_epochs": trial.suggest_int("num_train_epochs", 50, 100, step=10),
+            "num_train_epochs": trial.suggest_int("num_train_epochs", 1, 11, step=10),
             "weight_decay": trial.suggest_float("weight_decay", 0.0, 0.1),
             "per_device_train_batch_size": batch_size,
             "per_device_eval_batch_size": batch_size,
@@ -612,7 +706,7 @@ def data_train():
         hp_space=hp_space,
         direction="maximize",  # Maximize the METEOR score
         backend="optuna",
-        n_trials=50,
+        n_trials=1,
         compute_objective=lambda metrics: metrics["eval_meteor"], # Objective is eval_meteor
         pruner=optuna.pruners.MedianPruner(
             n_startup_trials=5,
@@ -624,10 +718,14 @@ def data_train():
     print("--Optimal parameters--")
     print("최적의 파라미터:")
 
+    for n, v in best_run.hyperparameters.items():
+        # v += 5 if n == "num_train_epochs" else v
+        print(n + ": " + str(v))
+
     #*******************************************************************
     #*******************************************************************
-    # tokenized_train_dataset, tokenized_eval_dataset, tokenized_test_dataset = data_preprocess(dcnt_limit=9000, test_size=0.1, eval_size=0.1)
-    tokenized_train_dataset, tokenized_eval_dataset, tokenized_test_dataset = data_preprocess(test_size=0.1, eval_size=0.1)
+    tokenized_train_dataset, tokenized_eval_dataset, tokenized_test_dataset = data_preprocess(dcnt_limit=9000, test_size=0.1, eval_size=0.1)
+    # tokenized_train_dataset, tokenized_eval_dataset, tokenized_test_dataset = data_preprocess(test_size=0.1, eval_size=0.1)
     #*******************************************************************
     #*******************************************************************
 
@@ -647,8 +745,6 @@ def data_train():
 
     # Set the best hyperparameters found during the search.
     for n, v in best_run.hyperparameters.items():
-        # v += 5 if n == "num_train_epochs" else v
-        print(n + ": " + str(v))
         setattr(final_trainer.args, n, v)
 
     print("\n최적의 하이퍼파라미터로 모델 재학습을 시작합니다.\n")
