@@ -1,8 +1,10 @@
 from flask import Flask, request, jsonify
 from transformers import pipeline
-import download_from_s3
+from download_from_s3 import download_model_from_s3
 import config
-import inference
+from inference import inference
+from mapping_point import map_gloss_to_point
+from data_load import load_valid_gloss_set
 # Flask 애플리케이션 객체 생성
 app = Flask(__name__)
 
@@ -13,7 +15,7 @@ LOCAL_UNI_GLOSS_SET_PATH = config.LOCAL_UNI_GLOSS_SET_PATH
 
 try:
     # Download the model from S3 to the local path
-    download_from_s3.download_model_from_s3(S3_MODEL_PATH,  S3_UNI_GLOSS_SET, LOCAL_MODEL_PATH, LOCAL_UNI_GLOSS_SET_PATH)
+    download_model_from_s3(S3_MODEL_PATH,  S3_UNI_GLOSS_SET, LOCAL_MODEL_PATH, LOCAL_UNI_GLOSS_SET_PATH)
     
 except Exception as e:
         print(f"Error: 에러 메시지를 확인해주세요 {e}")
@@ -24,6 +26,8 @@ text_to_gloss_pipeline = pipeline(
         tokenizer=LOCAL_MODEL_PATH,
         device_map="auto"
     )
+
+valid_gloss_set = load_valid_gloss_set
 
 # URL 경로 '/'에 접속했을 때 실행될 함수 정의
 @app.route('/', methods=['GET'])
@@ -48,11 +52,12 @@ def translate_text():
     # # 3. 로드된 모델로 예측 수행
     try:
         # 전역 변수로 로드된 translator를 사용해 예측 gloss list 출력
-        prediction_gloss_list = inference.inference(text_to_translate, text_to_gloss_pipeline)
-        
+        prediction_gloss_list = inference(text_to_translate, text_to_gloss_pipeline)
+
+        result = map_gloss_to_point(prediction_gloss_list, valid_gloss_set)
         
     #     # 4. 예측 결과를 JSON 형태로 반환
-        return jsonify({"original_text": prediction_gloss_list, "translated_text": "hihi"})
+        return jsonify(result), 202
 
     except Exception as e:
         # 모델 예측 중 에러가 발생할 경우

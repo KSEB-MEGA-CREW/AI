@@ -3,18 +3,10 @@ import boto3
 import json
 import data_load 
 
-def validate_gloss(gloss:str, valid_glosses:set):
-    """
-    Validate if the gloss is in the set of valid glosses.
-    """
-    if gloss not in valid_glosses:
-        # print(f"Warning: '{gloss}' is not a valid gloss.")
-        return False
-    return True
+def map_gloss_to_point(gloss_list:list, valid_gloss_set = None):
 
-def map_gloss_to_point(gloss_list:list):
-
-    valid_gloss_set = data_load.load_valid_gloss_set()
+    if valid_gloss_set:
+        valid_gloss_set = data_load.load_valid_gloss_set()
 
     # Create an S3 client
     s3 = boto3.client('s3')
@@ -22,8 +14,8 @@ def map_gloss_to_point(gloss_list:list):
     # Name of the S3 bucket
     bucket_name = 'mega-crew-ml-models-dev'
 
-    # List to store the JSON data from S3
-    point_list = []
+    # This will be the final, flat list of points
+    combined_point_list = []
 
     s3_file_keys = []
     try:
@@ -57,103 +49,47 @@ def map_gloss_to_point(gloss_list:list):
         actual_gloss = parts[-1]
         gloss_to_file_map[actual_gloss] = key
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+    # Filter the glosses first to know the actual number of files to process
+    glosses_to_process = [
+        gloss for gloss in gloss_list
+        if gloss in valid_gloss_set and gloss in gloss_to_file_map
+        # if gloss in gloss_to_file_map
+    ]
 
     # Iterate over the gloss list
-    for gloss in gloss_list:
-        if gloss not in valid_gloss_set:
-            continue
+    for i, gloss in enumerate(glosses_to_process):
         # Create the file path for the JSON file in the S3 bucket
         file_path = gloss_to_file_map.get(gloss)
         if file_path:
             try:
+                print("파일 경로:"+ file_path)
                 # Get the object from S3
                 response = s3.get_object(Bucket=bucket_name, Key=file_path)
                 # Read the content of the file
                 content = response['Body'].read().decode('utf-8')
                 # Parse the JSON data
                 data = json.loads(content)
-                # Append the data to the list
-                point_list.append(data)
+                
+                if data:
+                    # Add all frames from the current gloss
+                    combined_point_list.extend(data)
+
+                    # If it's not the last gloss, add the padding
+                    if i < len(glosses_to_process) - 1:
+                        last_frame = data[-1] # Get the last frame
+                        combined_point_list.extend([last_frame] * 15) # Add it 15 times
             except Exception as e:
                 # Print an error message if the file is not found or another error occurs
                 print(f"Error fetching {file_path}: {e}")
 
-    # Return the list of JSON data
-    return point_list
+    # Return the single combined list
+    file_path = "./temp.json"
+    with open(file_path, 'w', encoding='utf-8') as f:
+        json.dump(combined_point_list, f, indent=4, ensure_ascii=False)
+
+    return combined_point_list
 
 if __name__ == '__main__':
     # 'main' 함수를 호출하여 전체 프로세스를 시작합니다.
-    print(map_gloss_to_point(["사과", "dd", "경제3"]))
+    # map_gloss_to_point(["강2", "~대로1", "계례"])
+    print(map_gloss_to_point(["사과2", "딸기", "바나나"]))
