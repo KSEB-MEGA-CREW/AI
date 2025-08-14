@@ -71,6 +71,7 @@ def download_model_from_s3(s3_model_path, s3_gloss_set_path, local_model_path, l
     # 디렉터리가 없다면 만들기
     os.makedirs(local_model_path, exist_ok=True)
     # Get the directory path for the gloss set
+
     gloss_set_dir_path = os.path.dirname(local_gloss_set_path)
     # Create the local directory for the gloss set if it doesn't exist
     os.makedirs(gloss_set_dir_path, exist_ok=True)
@@ -146,15 +147,14 @@ def download_model_from_s3(s3_model_path, s3_gloss_set_path, local_model_path, l
             # Catch any exception that occurred during the download
             except Exception as exc:
                 # Print an error message including the key and the exception
-                print(f'{obj['Key']} generated an exception: {exc}')
+                print(f'{obj["Key"]} generated an exception: {exc}')
 
 
 
-def pipline():
+def load_asset():
     try:
         # Download the model from S3 to the local path
         download_model_from_s3(S3_MODEL_PATH,  S3_UNI_GLOSS_SET, LOCAL_MODEL_PATH, LOCAL_UNI_GLOSS_SET_PATH)
-        
         # Load the tokenizer and model from the local path
         trained_tokenizer = AutoTokenizer.from_pretrained(LOCAL_MODEL_PATH)
         trained_model = AutoModelForSeq2SeqLM.from_pretrained(LOCAL_MODEL_PATH, device_map="auto", ignore_mismatched_sizes=True)
@@ -191,5 +191,5 @@ def check_aws():
         print("Failed to verify AWS credentials.")
         print(f"Error: {e}")
 if __name__ == '__main__':
-    pipline()
+    load_asset
     # check_aws()

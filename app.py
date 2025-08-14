@@ -1,9 +1,9 @@
 from flask import Flask, request, jsonify
-# from transformers import pipeline
+from transformers import pipeline
 # Flask 애플리케이션 객체 생성
 app = Flask(__name__)
 
-# translator = pipeline()
+# trained_model, trained_tokenizer, uni_glosses_set = pipeline()
 
 # URL 경로 '/'에 접속했을 때 실행될 함수 정의
 @app.route('/', methods=['GET'])
