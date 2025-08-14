@@ -191,5 +191,5 @@ def check_aws():
         print("Failed to verify AWS credentials.")
         print(f"Error: {e}")
 if __name__ == '__main__':
-    load_asset
+    load_asset()
     # check_aws()
