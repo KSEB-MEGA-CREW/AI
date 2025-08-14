@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 import time
 
 # 1️⃣ 파일 경로 입력
-npy_file = r'C:\SoftwareEdu2025\project\Hand_Sound\KCH\signtotext\output_npy\before\경제1\VXPAKOKS241130950_경제1.npy'
+npy_file = r"C:\SoftwareEdu2025\project\Hand_Sound\KCH\signtotext\output_npy\cleaned_npy\고맙다1\VXPAKOKS240023310_고맙다1.npy"
 
 if not os.path.exists(npy_file):
     raise FileNotFoundError(f"❌ 파일이 존재하지 않습니다: {npy_file}")

@@ -3,8 +3,8 @@ import json
 import os
 
 # 경로 설정
-npy_dir = r"C:\SoftwareEdu2025\project\Hand_Sound\KCH\signtotext"       # npy 파일들이 들어있는 폴더
-output_dir = r"C:\SoftwareEdu2025\project\Hand_Sound\KCH\signtotext\dataset\npy to json"        # 저장할 폴더명
+npy_dir = r"C:\SoftwareEdu2025\project\sign_mediapipe\Assets\StreamingAssets"      # npy 파일들이 들  어있는 폴더
+output_dir = r"C:\SoftwareEdu2025\project\sign_mediapipe\Assets\StreamingAssets"        # 저장할 폴더명
 os.makedirs(output_dir, exist_ok=True)  # 폴더 없으면 생성
 
 # 랜드마크 이름
