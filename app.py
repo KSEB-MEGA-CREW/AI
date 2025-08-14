@@ -1,9 +1,29 @@
 from flask import Flask, request, jsonify
 from transformers import pipeline
+import download_from_s3
+import config
+import inference
 # Flask 애플리케이션 객체 생성
 app = Flask(__name__)
 
-# trained_model, trained_tokenizer, uni_glosses_set = pipeline()
+LOCAL_MODEL_PATH = config.LOCAL_MODEL_PATH
+S3_MODEL_PATH = config.S3_MODEL_PATH
+S3_UNI_GLOSS_SET = config.S3_UNI_GLOSS_SET
+LOCAL_UNI_GLOSS_SET_PATH = config.LOCAL_UNI_GLOSS_SET_PATH
+
+try:
+    # Download the model from S3 to the local path
+    download_from_s3.download_model_from_s3(S3_MODEL_PATH,  S3_UNI_GLOSS_SET, LOCAL_MODEL_PATH, LOCAL_UNI_GLOSS_SET_PATH)
+    
+except Exception as e:
+        print(f"Error: 에러 메시지를 확인해주세요 {e}")
+
+text_to_gloss_pipeline = pipeline(
+        "translation_ko_to_KSL",  # This task is suitable for sequence-to-sequence models.
+        model=LOCAL_MODEL_PATH,
+        tokenizer=LOCAL_MODEL_PATH,
+        device_map="auto"
+    )
 
 # URL 경로 '/'에 접속했을 때 실행될 함수 정의
 @app.route('/', methods=['GET'])
@@ -19,24 +39,25 @@ def translate_text():
     예시 요청: http://127.0.0.1:5000/translate?text=Hello world
     """
     # 2. GET 요청에서 'text' 파라미터 추출
-    text = request.args.get('text')
+    text_to_translate = request.args.get('text')
 
     # # 'text' 파라미터가 없는 경우 에러 처리
-    # if not text_to_translate:
-    #     return jsonify({"error": "번역할 'text' 파라미터가 필요합니다."}), 400
+    if not text_to_translate:
+        return jsonify({"error": "번역할 'text' 파라미터가 필요합니다."}), 400
 
     # # 3. 로드된 모델로 예측 수행
-    # try:
-    #     # 전역 변수로 로드된 translator를 사용해 예측
-    #     prediction = translator(text_to_translate)
+    try:
+        # 전역 변수로 로드된 translator를 사용해 예측 gloss list 출력
+        prediction_gloss_list = inference.inference(text_to_translate, text_to_gloss_pipeline)
+        
         
     #     # 4. 예측 결과를 JSON 형태로 반환
-    return jsonify({"original_text": text, "translated_text": "hihi"})
+        return jsonify({"original_text": prediction_gloss_list, "translated_text": "hihi"})
 
-    # except Exception as e:
-    #     # 모델 예측 중 에러가 발생할 경우
-    #     print(f"Error during translation: {e}")
-    #     return jsonify({"error": "번역 중 오류가 발생했습니다."}), 500
+    except Exception as e:
+        # 모델 예측 중 에러가 발생할 경우
+        print(f"Error during translation: {e}")
+        return jsonify({"error": "번역 중 오류가 발생했습니다."}), 500
 
 
 
