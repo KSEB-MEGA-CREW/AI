@@ -25,12 +25,21 @@ ENV PATH=$CONDA_DIR/bin:$PATH
 WORKDIR /app
 
 # Copy the Conda environment file into the container
-COPY environment.yml .
+COPY environment.final.yml .
+
+# Update conda to the latest version and accept the Terms of Service for the default channels.
+# Accept the Terms of Service for the default channels using the official command.
+# This is the only supported method for the installed conda version.
+RUN conda tos accept --override-channels --channel defaults
+
+# It's good practice to update conda itself. Now that ToS is accepted, this should work.
+RUN conda update -n base -c defaults conda -y
 
 # Create the Conda environment from the environment.yml file.
+
 # This command sets up the 'KSEB' environment with all specified conda and pip packages.
 # This step can take a significant amount of time due to the large number of dependencies.
-RUN conda env create -f environment.yml
+RUN conda env create -f environment.final.yml
 
 # Copy the rest of the application source code into the container
 COPY . .
@@ -41,4 +50,4 @@ EXPOSE 1958
 # Define the default command to run when the container starts.
 # It activates the 'KSEB' conda environment and then executes the Flask app.
 # Using --no-capture-output to ensure logs are streamed correctly.
-CMD ["/bin/bash", "-c", "conda run --no-capture-output -n KSEB python app.py"]
+CMD ["/bin/bash", "-c", "conda run --no-capture-output -n kseb-prod python app.py"]

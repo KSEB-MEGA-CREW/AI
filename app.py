@@ -32,7 +32,9 @@ valid_gloss_set = load_valid_gloss_set
 # URL 경로 '/'에 접속했을 때 실행될 함수 정의
 @app.route('/', methods=['GET'])
 def root_test():
-    return jsonify({"value": "hihi"}), 200
+    if text_to_gloss_pipeline is None:
+        return jsonify({"error": "Model pipeline is not available. The service is likely initializing or has failed."}), 503
+    return jsonify({"status": "Service is running"}), 200
 
 
 @app.route('/T2G/translate', methods=['GET'])
@@ -42,6 +44,9 @@ def translate_text():
     URL 파라미터로 텍스트를 받아 번역 결과를 JSON으로 반환합니다.
     예시 요청: http://127.0.0.1:5000/translate?text=Hello world
     """
+    if text_to_gloss_pipeline is None:
+        return jsonify({"error": "Model pipeline is not available."}), 503
+    
     # 2. GET 요청에서 'text' 파라미터 추출
     text_to_translate = request.args.get('text')
 
