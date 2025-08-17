@@ -78,3 +78,4 @@ ksl-tokenizer/
 preprocessed_data/
 selected_json/
 text_to_word/plots
+T2G_flask/t2g_model

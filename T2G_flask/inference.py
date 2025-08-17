@@ -2,29 +2,18 @@ import warnings
 import torch
 from transformers import pipeline # Import pipeline
 import config
+import os
 
 # Suppress specific warnings for a cleaner output
 warnings.filterwarnings("ignore", message="The following device_map keys do not match any submodules in the model:.*")
 
 # --- Configuration ---
 # Get the output directory for the model from the T2G_flask/config.py file
-OUTPUT_DIR = config.OUTPUT_DIR
+OUTPUT_DIR = config.LOCAL_MODEL_PATH
+OUTPUT_DIR = os.path.abspath(OUTPUT_DIR)
 # Set the maximum length for the target sequence (gloss)
 max_target_length = 128
 
-# --- Pipeline Initialization ---
-# Create the pipeline object once when the script is loaded.
-# This is much more efficient as the model is loaded into memory only once.
-print("Initializing Text-to-Gloss pipeline for T2G_flask...")
-# Define the pipeline with the appropriate task, model path, and tokenizer path.
-# device_map='auto' will automatically use a GPU if available.
-text_to_gloss_pipeline = pipeline(
-    "translation_ko_to_KSL",  # This task is suitable for sequence-to-sequence models.
-    model=OUTPUT_DIR,
-    tokenizer=OUTPUT_DIR,
-    device_map="auto"
-)
-print("Pipeline initialized successfully.")
 
 def inference(input_text: str, text_to_gloss_pipeline: object):
     """
@@ -69,6 +58,20 @@ def inference(input_text: str, text_to_gloss_pipeline: object):
 # This standard Python construct ensures that the following code runs only when
 # the script is executed directly (not when imported as a module).
 if __name__ == '__main__':
+    # --- Pipeline Initialization ---
+    # Create the pipeline object once when the script is loaded.
+    # This is much more efficient as the model is loaded into memory only once.
+    print("Initializing Text-to-Gloss pipeline for T2G_flask...")
+    # Define the pipeline with the appropriate task, model path, and tokenizer path.
+    # device_map='auto' will automatically use a GPU if available.
+    text_to_gloss_pipeline = pipeline(
+        "translation",  # Use the standard "translation" task for seq2seq models.
+        model=OUTPUT_DIR,
+        tokenizer=OUTPUT_DIR,
+        device_map="auto"
+    )
+    print("Pipeline initialized successfully.")
+
     # Define a test sentence.
     test_sentence = "사춘기 때 아이에게 일어나는 변화를 잘 이해하고 지나가는 것이 필요합니다."
     # Call the inference function to start the process.
