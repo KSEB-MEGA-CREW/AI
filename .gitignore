@@ -76,3 +76,5 @@ kobart-finetuned-ksl-glosser/
 KSEB_json_data/
 ksl-tokenizer/
 preprocessed_data/
+selected_json/
+text_to_word/plots
