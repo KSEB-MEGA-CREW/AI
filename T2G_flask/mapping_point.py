@@ -83,9 +83,9 @@ def map_gloss_to_point(gloss_list:list, valid_gloss_set = None):
                 print(f"Error fetching {file_path}: {e}")
 
     # Return the single combined list
-    file_path = "./temp.json"
-    with open(file_path, 'w', encoding='utf-8') as f:
-        json.dump(combined_point_list, f, indent=4, ensure_ascii=False)
+    # file_path = "./temp.json"
+    # with open(file_path, 'w', encoding='utf-8') as f:
+    #     json.dump(combined_point_list, f, indent=4, ensure_ascii=False)
 
     return combined_point_list
 
