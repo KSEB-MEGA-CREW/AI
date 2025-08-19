@@ -65,7 +65,7 @@ if __name__ == '__main__':
     # Define the pipeline with the appropriate task, model path, and tokenizer path.
     # device_map='auto' will automatically use a GPU if available.
     text_to_gloss_pipeline = pipeline(
-        "translation",  # Use the standard "translation" task for seq2seq models.
+        "translation_ko_to_KSL",  # Use the standard "translation" task for seq2seq models.
         model=OUTPUT_DIR,
         tokenizer=OUTPUT_DIR,
         device_map="auto"
