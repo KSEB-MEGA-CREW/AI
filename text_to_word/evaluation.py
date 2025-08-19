@@ -29,7 +29,9 @@ import config
 
 # --- Configuration ---
 # Set the base directory of the model to be evaluated.
-BASE_MODEL_DIR = "/home/202044005/KSEB/text_to_word/kobart-finetuned-ksl-glosser"
+# BASE_MODEL_DIR = "/home/202044005/KSEB/text_to_word/kobart-finetuned-ksl-glosser"
+
+BASE_MODEL_DIR = "/home/202044005/KSEB/text_to_word/model"
 # Set the path to the data file.
 DATA_PATH = config.DATA_PATH
 # Set the maximum length for input sequences.
@@ -118,7 +120,7 @@ def evaluate_checkpoint(model_dir, tokenizer, test_dataset, epoch=None):
                 input_ids=input_ids,
                 attention_mask=attention_mask,
                 max_length=max_target_length,
-                num_beams=1,
+                num_beams=14,
                 do_sample=False
             )
 
@@ -181,7 +183,7 @@ def main():
         # Print a warning if the training arguments cannot be loaded.
         print(f"Warning: Could not load training_args.bin: {e}. Epoch numbers will not be calculated.")
         # Set the training batch size to a default value.
-        train_batch_size = 16 # Default value
+        train_batch_size = 32 # Default value
 
     # Load the full dataset.
     full_data = data_load.load_jsonl(DATA_PATH)

@@ -7,18 +7,18 @@ from collections import Counter
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 # ====== 경로 설정 ======
-# root_folder = r"/storage/202044005/NIKL_Sign Language Parallel Corpus_2024_BD_PP"   # 변환할 폴더(최상위)(중)
-# root_folder = r"/storage/202044005/NIKL_Sign Language Parallel Corpus_2024_ED_ID"   # 변환할 폴더(최상위)
-# root_folder = r"/storage/202044005/NIKL_Sign Language Parallel Corpus_2024_FI_BP"   # 변환할 폴더(최상위)
-root_folder = r"/storage/202044005/NIKL_Sign Language Parallel Corpus_2024_FI_IN"   # 변환할 폴더(최상위)(중)
-# root_folder = r"/storage/202044005/NIKL_Sign Language Parallel Corpus_2024_FI_IS"   # 변환할 폴더(최상위)(중)
-# root_folder = r"/storage/202044005/NIKL_Sign Language Parallel Corpus_2024_FI_MB"   # 변환할 폴더(최상위)(중)
-# root_folder = r"/storage/202044005/NIKL_Sign Language Parallel Corpus_2024_FI_MR"   # 변환할 폴더(최상위)
-# root_folder = r"/storage/202044005/NIKL_Sign Language Parallel Corpus_2024_LI_CA"   # 변환할 폴더(최상위) (중)
-# root_folder = r"/storage/202044005/NIKL_Sign Language Parallel Corpus_2024_LI_CO(완료)"   # 변환할 폴더(최상위)(중)
+# root_folder = r"/storage/202044005/NIKL_Sign Language Parallel Corpus_2024_BD_PP"   # 변환할 폴더(최상위)(완)
+# root_folder = r"/storage/202044005/NIKL_Sign Language Parallel Corpus_2024_ED_ID"   # 변환할 폴더(최상위) (완)
+# root_folder = r"/storage/202044005/NIKL_Sign Language Parallel Corpus_2024_FI_BP"   # 변환할 폴더(최상위)(완)
+# root_folder = r"/storage/202044005/NIKL_Sign Language Parallel Corpus_2024_FI_IN"   # 변환할 폴더(최상위)(완)
+# root_folder = r"/storage/202044005/NIKL_Sign Language Parallel Corpus_2024_FI_IS"   # 변환할 폴더(최상위)(완)
+# root_folder = r"/storage/202044005/NIKL_Sign Language Parallel Corpus_2024_FI_MB"   # 변환할 폴더(최상위)(완)
+# root_folder = r"/storage/202044005/NIKL_Sign Language Parallel Corpus_2024_FI_MR"   # 변환할 폴더(최상위) (완)
+# root_folder = r"/storage/202044005/NIKL_Sign Language Parallel Corpus_2024_LI_CA"   # 변환할 폴더(최상위) (완)
+# root_folder = r"/storage/202044005/NIKL_Sign Language Parallel Corpus_2024_LI_CO(완료)"   # 변환할 폴더(최상위)(완)
 # root_folder = r"/storage/202044005/NIKL_Sign Language Parallel Corpus_2024_LI_DC(완료)"   # 변환할 폴더(최상위)(완)
 # root_folder = r"/storage/202044005/NIKL_Sign Language Parallel Corpus_2024_LI_SH(완료)"   # 변환할 폴더(최상위)(완)
-# root_folder = r"/storage/202044005/NIKL_Sign Language Parallel Corpus_2024_LI_WR"   # 변환할 폴더(최상위)(중)
+root_folder = r"/storage/202044005/NIKL_Sign Language Parallel Corpus_2024_LI_WR"   # 변환할 폴더(최상위)(완)
 output_dir = r"/storage/202044005/video_to_json"
 os.makedirs(output_dir, exist_ok=True)
 
