@@ -38,6 +38,7 @@ import util.t2g_tokenizer as t2g_tokenizer
 import optuna
 import evaluate
 import numpy as np
+import os
 import glob
 # Import matplotlib for plotting
 # 플롯팅을 위해 matplotlib를 임포트합니다.
@@ -331,86 +332,106 @@ def save_plots(log_history, all_checkpoint_metrics, output_dir):
     # --- New Plot: Checkpoint Test Metrics (Grouped Bar Chart) ---
     # --- 새로운 플롯: 체크포인트 테스트 메트릭 (그룹화된 막대 차트) ---
     if all_checkpoint_metrics:
-        # Extract checkpoint names for x-axis labels.
-        # x축 레이블의 체크포인트 이름을 추출합니다.
+        # Define the width of the bars.
+        # 막대의 너비를 정의합니다.
         width = 0.2
-        fig, axes = plt.subplots(nrows=3, ncols=1, figsize=(10, 4))
-        fig.suptitle('Test scores for each checkpoints', fontsize=16)
+        
+        # Dynamically determine the number of rows based on the number of checkpoints.
+        # 체크포인트 수에 따라 행 수를 동적으로 결정합니다.
+        num_checkpoints = len(all_checkpoint_metrics)
+        
+        # Create subplots with constrained_layout for automatic adjustment to prevent title overlap.
+        # 제목 겹침을 방지하기 위해 constrained_layout으로 서브플롯을 생성하여 자동 조정합니다.
+        # squeeze=False ensures that 'axes' is always a 2D array, even with one subplot.
+        # squeeze=False는 서브플롯이 하나일 때도 'axes'가 항상 2D 배열이 되도록 보장합니다.
+        # Original code:
+        # fig, axes = plt.subplots(nrows=3, ncols=1, figsize=(10, 30))
+        fig, axes = plt.subplots(nrows=num_checkpoints, ncols=1, figsize=(10, 8 * num_checkpoints), constrained_layout=True, squeeze=False)
+        
+        # Flatten the axes array to easily iterate over it.
+        # 축 배열을 평탄화하여 쉽게 반복할 수 있도록 합니다.
+        axes = axes.flatten()
+
+        # Set the main title for the entire figure.
+        # 전체 그림의 주 제목을 설정합니다.
+        fig.suptitle('Test scores for each checkpoints')
+
+        # Iterate over each checkpoint's metrics to create a subplot for each.
+        # 각 체크포인트의 메트릭을 반복하여 각각에 대한 서브플롯을 생성합니다.
         for i, metrics in enumerate(all_checkpoint_metrics):
+            # Get the current axis for plotting.
+            # 플로팅을 위한 현재 축을 가져옵니다.
+            ax = axes[i]
+            
+            # Define centered positions for the bars for better visualization.
+            # 더 나은 시각화를 위해 막대의 중앙 위치를 정의합니다.
+            positions = np.array([-1.5, -0.5, 0.5, 1.5]) * width * 2
+
+            # Plot the 'test_loss' bar if it exists in the metrics.
+            # 메트릭에 'test_loss'가 있으면 막대를 플로팅합니다.
             if 'test_loss' in metrics:
-                loss = axes[i].bar(i - width, metrics['test_loss'], width, label='Test Loss', color='lightblue')
-                axes[i].bar_label(loss, fmt='%.4f')
+                # Create the bar for test loss.
+                # 테스트 손실에 대한 막대를 생성합니다.
+                loss = ax.bar(positions[0], metrics['test_loss'], width, label='Test Loss', color='lightblue')
+                # Add a label with the value on top of the bar.
+                # 막대 위에 값이 있는 레이블을 추가합니다.
+                ax.bar_label(loss, fmt='%.4f')
+
+            # Plot the 'test_bleu' bar if it exists in the metrics.
+            # 메트릭에 'test_bleu'가 있으면 막대를 플로팅합니다.
             if 'test_bleu' in metrics:
-                blue = axes[i].bar(i, metrics['test_bleu'], width, label='Test BLEU', color='orange')
-                axes[i].bar_label(blue, fmt='%.4f')
+                # Create the bar for test BLEU score.
+                # 테스트 BLEU 점수에 대한 막대를 생성합니다.
+                blue = ax.bar(positions[1], metrics['test_bleu'], width, label='Test BLEU', color='orange')
+                # Add a label with the value on top of the bar.
+                # 막대 위에 값이 있는 레이블을 추가합니다.
+                ax.bar_label(blue, fmt='%.4f')
+
+            # Plot the 'test_rouge1' bar if it exists in the metrics.
+            # 메트릭에 'test_rouge1'이 있으면 막대를 플로팅합니다.
             if 'test_rouge1' in metrics:
-                rouge = axes[i].bar(i + width, metrics['test_rouge1'], width, label='Test ROUGE-1', color='green')
-                axes[i].bar_label(rouge, fmt='%.4f')
+                # Create the bar for test ROUGE-1 score.
+                # 테스트 ROUGE-1 점수에 대한 막대를 생성합니다.
+                rouge = ax.bar(positions[2], metrics['test_rouge1'], width, label='Test ROUGE-1', color='green')
+                # Add a label with the value on top of the bar.
+                # 막대 위에 값이 있는 레이블을 추가합니다.
+                ax.bar_label(rouge, fmt='%.4f')
+
+            # Plot the 'test_meteor' bar if it exists in the metrics.
+            # 메트릭에 'test_meteor'가 있으면 막대를 플로팅합니다.
             if 'test_meteor' in metrics:
-                meteor = axes[i].bar(i + 2 * width, metrics['test_meteor'], width, label='Test METEOR', color='purple')
-                axes[i].bar_label(meteor, fmt='%.4f')
-            axes[i].set_title(f'Test score of {metrics.get("checkpoint", "N/A")} epoch: {metrics.get("epoch", "N/A")}')
-            axes[i].set_ylabel('Score')
-            axes[i].grid(True)
-            axes[i].legend()
-        fig.tight_layout()
+                # Create the bar for test METEOR score.
+                # 테스트 METEOR 점수에 대한 막대를 생성합니다.
+                meteor = ax.bar(positions[3], metrics['test_meteor'], width, label='Test METEOR', color='purple')
+                # Add a label with the value on top of the bar.
+                # 막대 위에 값이 있는 레이블을 추가합니다.
+                ax.bar_label(meteor, fmt='%.4f')
+
+            # Set the title for the individual subplot.
+            # 개별 서브플롯의 제목을 설정합니다.
+            ax.set_title(f'Test score of {metrics.get("checkpoint", "N/A")} epoch: {metrics.get("epoch", "N/A")}')
+            # Set the y-axis label.
+            # y축 레이블을 설정합니다.
+            ax.set_ylabel('Score')
+            # Enable the grid for better readability.
+            # 가독성을 높이기 위해 그리드를 활성화합니다.
+            ax.grid(True)
+            # Display the legend for the bars.
+            # 막대에 대한 범례를 표시합니다.
+            ax.legend()
+            # Remove x-axis ticks as their positions are arbitrary.
+            # x축 눈금의 위치가 임의적이므로 제거합니다.
+            ax.set_xticks([])
+        
+        # Define the path to save the plot image.
+        # 플롯 이미지를 저장할 경로를 정의합니다.
         test_plot_path = os.path.join(output_dir, 'test_score_plot.png')
+        # Save the figure to the specified path.
+        # 지정된 경로에 그림을 저장합니다.
         plt.savefig(test_plot_path)
+        # Close the figure to free up memory.
+        # 메모리를 확보하기 위해 그림을 닫습니다.
         plt.close(fig)
-
-
-    # --- New Plot: Checkpoint Test Loss (Bar Chart) ---
-    # --- 새로운 플롯: 체크포인트 테스트 손실 (막대 차트) ---
-    # if all_checkpoint_metrics:
-    #     # Extract checkpoint names for x-axis labels.
-    #     # x축 레이블의 체크포인트 이름을 추출합니다.
-    #     checkpoint_names = [m.get('checkpoint', f'CP {i}') for i, m in enumerate(all_checkpoint_metrics)]
-    #     # Extract test loss values.
-    #     # 테스트 손실 값을 추출합니다.
-    #     test_losses = [m.get('test_loss') for m in all_checkpoint_metrics]
-
-    #     # Plot bars for test loss if data is available.
-    #     # 데이터가 있는 경우 테스트 손실에 대한 막대를 플로팅합니다.
-    #     if any(l is not None for l in test_losses):
-    #         # Create a new figure.
-    #         # 새 그림을 만듭니다.
-    #         plt.figure(figsize=(12, 7))
-    #         # Create bars for test losses.
-    #         # 테스트 손실에 대한 막대를 만듭니다.
-    #         bars = plt.bar(checkpoint_names, [l or 0 for l in test_losses], color='coral')
-            
-    #         # Set the x-axis label.
-    #         # x축 레이블을 설정합니다.
-    #         plt.xlabel('Checkpoint')
-    #         # Set the y-axis label.
-    #         # y축 레이블을 설정합니다.
-    #         plt.ylabel('Loss')
-    #         # Set the plot title.
-    #         # 플롯 제목을 설정합니다.
-    #         plt.title('Test Loss per Checkpoint')
-    #         # Rotate x-axis labels for better readability.
-    #         # 가독성을 높이기 위해 x축 레이블을 회전합니다.
-    #         plt.xticks(rotation=45, ha="right")
-    #         # Enable the y-axis grid.
-    #         # y축 그리드를 활성화합니다.
-    #         plt.grid(True, axis='y', linestyle='--', alpha=0.7)
-            
-    #         # Add labels on top of bars.
-    #         # 막대 위에 레이블을 추가합니다.
-    #         plt.bar_label(bars, fmt='%.4f')
-            
-    #         # Adjust layout to prevent labels from overlapping.
-    #         # 레이블이 겹치지 않도록 레이아웃을 조정합니다.
-    #         plt.tight_layout()
-
-    #         # Save the figure.
-    #         # 그림을 저장합니다.
-    #         checkpoint_loss_path = os.path.join(output_dir, 'checkpoint_test_loss_bar.png')
-    #         plt.savefig(checkpoint_loss_path)
-    #         print(f"Checkpoint loss bar plot saved to {checkpoint_loss_path}")
-    #         # Close the plot to free up memory.
-    #         # 메모리를 확보하기 위해 플롯을 닫습니다.
-    #         plt.close()
 
 # 데이터 전처리 함수
 def data_preprocess(dcnt_limit=None, test_size=None, eval_size=None):
@@ -614,7 +635,7 @@ def data_train():
     #*******************************************************************
     # --1-- 데이터 로드
     # Load and preprocess the dataset.
-    tokenized_train_dataset, tokenized_eval_dataset, _ = data_preprocess(dcnt_limit=9000, eval_size=0.1)
+    tokenized_train_dataset, tokenized_eval_dataset, _ = data_preprocess(dcnt_limit=10, eval_size=0.1)
     #*******************************************************************
     #*******************************************************************
 
@@ -689,7 +710,7 @@ def data_train():
         # 
         params = {
             "learning_rate": trial.suggest_float("learning_rate", 5e-6, 5e-5, log=True),
-            "num_train_epochs": trial.suggest_int("num_train_epochs", 1, 11, step=10),
+            "num_train_epochs": trial.suggest_int("num_train_epochs", 10, 100),
             "weight_decay": trial.suggest_float("weight_decay", 0.0, 0.1),
             "per_device_train_batch_size": batch_size,
             "per_device_eval_batch_size": batch_size,
@@ -724,7 +745,7 @@ def data_train():
 
     #*******************************************************************
     #*******************************************************************
-    tokenized_train_dataset, tokenized_eval_dataset, tokenized_test_dataset = data_preprocess(dcnt_limit=9000, test_size=0.1, eval_size=0.1)
+    tokenized_train_dataset, tokenized_eval_dataset, tokenized_test_dataset = data_preprocess(dcnt_limit=100, test_size=0.1, eval_size=0.1)
     # tokenized_train_dataset, tokenized_eval_dataset, tokenized_test_dataset = data_preprocess(test_size=0.1, eval_size=0.1)
     #*******************************************************************
     #*******************************************************************
