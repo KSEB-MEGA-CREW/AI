@@ -35,7 +35,7 @@ matplotlib.rcParams['axes.unicode_minus'] = False
 np.set_printoptions(suppress=True)
 
 # 🔸 경로 설정 (필요 시 변경)
-DATA_PATH = r"C:\\want_npy_v2"                     # 라벨별 폴더 구조 하의 .npy
+DATA_PATH = r"C:\\want_npy_v2"                     # 라벨/시나리오별 폴더 구조 하의 .npy
 SAVE_DIR  = r"C:\\models\\v5_cnn_bo_reports[14]"   # 모델/리포트 산출물 저장 폴더
 os.makedirs(SAVE_DIR, exist_ok=True)
 
@@ -43,13 +43,15 @@ os.makedirs(SAVE_DIR, exist_ok=True)
 REQUIRED_FRAMES = 10      # 시퀀스 길이(프레임 수)
 EXPECTED_LEN    = 194     # 프레임당 feature 길이 (채널 수)
 TOP_N           = 17      # (none 제외) 상위 라벨 개수
-SAMPLES_PER_CLASS = 293   # 라벨별 최대 사용 샘플 수
+SAMPLES_PER_CLASS = 293   # 각 라벨 최대 사용 샘플 수
 INCLUDE_NONE    = True    # 'none' 라벨 자동 포함
+# (선택) none만 별도 상한을 두고 싶으면 아래 값을 바꾸세요. None이면 SAMPLES_PER_CLASS와 동일하게 처리.
+SAMPLES_PER_CLASS_NONE = None
 
 # 🔸 Bayesian Optimization 설정
-BO_ENABLE    = True                  # 베이지안 최적화 사용
-BO_INIT      = 8                     # 초기 랜덤 탐색 횟수
-BO_ITER      = 20                    # 탐색 반복 횟수
+BO_ENABLE    = True
+BO_INIT      = 8
+BO_ITER      = 20
 BO_RANDOM_SEED = 42
 
 # 🔸 재현성 고정
@@ -108,20 +110,30 @@ def temporal_resample(seq, T=REQUIRED_FRAMES, D=EXPECTED_LEN):
     return (1 - w) * s0 + w * s1
 
 # =============================
-# 데이터 로딩
+# 데이터 로딩 (시나리오→'none' 매핑)
 # =============================
+# 여기에 none으로 취급할 폴더 이름들을 등록하세요.
+NONE_ALIASES = {
+    'none',
+    'empty_frame', 'hands_down', 'typing_mouse',
+    'phone_usage', 'head_touch_glasses', 'look_around'
+}
+
 label_files = defaultdict(list)
 for root, _, files in os.walk(DATA_PATH):
+    label_raw = os.path.basename(root)
+    label = 'none' if label_raw in NONE_ALIASES else label_raw  # 🔸 핵심: 시나리오들을 'none'으로 통합
     for file in files:
         if file.endswith('.npy'):
-            label = os.path.basename(root)
             label_files[label].append(os.path.join(root, file))
 
+# 라벨별 개수 확인
 label_count_list = sorted(label_files.items(), key=lambda x: len(x[1]), reverse=True)
-print("\n📊 라벨별 npy 개수:")
+print("\n📊 라벨별 npy 개수(시나리오 통합 반영):")
 for i, (label, files) in enumerate(label_count_list, 1):
     print(f"{i:3d}. {label:15s}: {len(files)}개")
 
+# 학습 라벨 목록 구성
 selected_labels = [label for label, files in label_count_list if label != 'none'][:TOP_N]
 if INCLUDE_NONE and 'none' in label_files:
     selected_labels.append('none')
@@ -170,9 +182,15 @@ def augment_sequence(sequence,
 # =============================
 sequences, labels = [], []
 skipped = []
+
+# none의 상한 결정
+none_cap = SAMPLES_PER_CLASS if SAMPLES_PER_CLASS_NONE is None else SAMPLES_PER_CLASS_NONE
+
 for label in selected_labels:
     all_files = label_files[label]
-    files_to_use = random.sample(all_files, min(len(all_files), SAMPLES_PER_CLASS))
+    cap_for_label = none_cap if label == 'none' else SAMPLES_PER_CLASS
+    files_to_use = random.sample(all_files, min(len(all_files), cap_for_label))
+
     for file_path in files_to_use:
         seq, err = safe_load_sequence(file_path, expected_len=EXPECTED_LEN)
         if err is not None:
@@ -286,7 +304,7 @@ best_params = {
 }
 
 if BO_ENABLE and HAS_BO:
-    random.seed(BO_RANDOM_SEED); np.random.seed(BO_RANDOM_SEED); tf.random.set_seed(BO_RANDOM_SEED)
+    random.seed(BO_RANDOM_SEED); np.random.seed(BO_RANDOM_SEED); tf.random.set_seed(GLOBAL_SEED)
 
     def objective(filters1, filters2, k1, k2, dropout, log_lr, l2, batch_q):
         f1 = int(round(filters1)); f2 = int(round(filters2))
@@ -374,7 +392,6 @@ history = final_model.fit(
 model_path = os.path.join(SAVE_DIR, 'gesture_model.h5')
 final_model.save(model_path)
 
-# 이미 위에서 생성됨: label_list
 with open(os.path.join(SAVE_DIR, 'label_map.json'), 'w', encoding='utf-8') as f:
     json.dump(label_list, f, ensure_ascii=False, indent=2)
 

@@ -19,8 +19,8 @@ def draw_text_korean(frame, text, position, font_size=30, color=(255,255,255)):
     return cv2.cvtColor(np.array(img_pil), cv2.COLOR_RGB2BGR)
 
 # ===== 모델 및 라벨 로딩 =====
-MODEL_PATH = r"C:\models\v6_cnn_reports[17]\gesture_model.h5"
-LABEL_PATH = r"C:\models\v6_cnn_reports[17]\label_map.json"
+MODEL_PATH = r"C:\models\v7_cnn_bo_reports[66]\gesture_model.h5"
+LABEL_PATH = r"C:\models\v7_cnn_bo_reports[66]\label_map.json"
 
 model = load_model(MODEL_PATH, compile=False)
 with open(LABEL_PATH, "r", encoding="utf-8") as f:
@@ -35,7 +35,7 @@ mp_drawing = mp.solutions.drawing_utils
 POSE_SKIP_INDEXES = set(range(17, 33))  # 하체 제외(0~16만 사용 → 학습과 동일 17포인트)
 EXPECTED_KEYPOINTS = 194
 BUFFER_SIZE = 10  # ← train 프레임 수와 일치
-CONFIDENCE_THRESHOLD = 0.9  # 0.95 → 너무 보수적일 수 있어 0.80~0.90 권장
+CONFIDENCE_THRESHOLD = 0.96  # 0.95 → 너무 보수적일 수 있어 0.80~0.90 권장
 STABLE_THRESHOLD = 3
 RESET_INTERVAL = 5.0
 MAX_PADDING_RATIO = 0.5
