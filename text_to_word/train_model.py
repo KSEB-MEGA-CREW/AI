@@ -1,16 +1,4 @@
 import os
-# # TensorFlow와 PyTorch 간의 GPU 메모리 충돌을 방지하기 위해 TensorFlow의 메모리 증가를 활성화합니다.
-# # 이렇게 하면 TensorFlow가 시작 시 모든 GPU 메모리를 할당하는 것을 막아 PyTorch와 함께 원활하게 실행될 수 있습니다.
-# os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
-# try:
-#     import tensorflow as tf
-#     gpus = tf.config.experimental.list_physical_devices('GPU')
-#     if gpus:
-#         for gpu in gpus:
-#             tf.config.experimental.set_memory_growth(gpu, True)
-# except (ImportError, RuntimeError):
-#     pass
-
 import warnings
 # 'torch' 라이브러리를 임포트합니다. 파이토치는 딥러닝 모델을 구축하고 학습시키는 데 사용되는 핵심 프레임워크입니다.
 import torch
@@ -635,7 +623,7 @@ def data_train():
     #*******************************************************************
     # --1-- 데이터 로드
     # Load and preprocess the dataset.
-    tokenized_train_dataset, tokenized_eval_dataset, _ = data_preprocess(dcnt_limit=10, eval_size=0.1)
+    tokenized_train_dataset, tokenized_eval_dataset, _ = data_preprocess(dcnt_limit=18000, eval_size=0.1)
     #*******************************************************************
     #*******************************************************************
 
@@ -705,16 +693,14 @@ def data_train():
         print("  - Suggested hyperparameters:")
         batch_size = trial.suggest_categorical("per_device_batch_size", [16, 32])
 
-        # Suggest and define hyperparameters in a dictionary
-        # 하이퍼파라미터를 제안하고 딕셔너리로 정의합니다.
-        # 
         params = {
             "learning_rate": trial.suggest_float("learning_rate", 5e-6, 5e-5, log=True),
-            "num_train_epochs": trial.suggest_int("num_train_epochs", 10, 100),
+            "num_train_epochs": trial.suggest_int("num_train_epochs", 5, 40),
             "weight_decay": trial.suggest_float("weight_decay", 0.0, 0.1),
             "per_device_train_batch_size": batch_size,
             "per_device_eval_batch_size": batch_size,
-            "generation_num_beams": trial.suggest_int( "generation_num_beams", 3, 10)
+            "generation_num_beams": trial.suggest_int( "generation_num_beams", 3, 10),
+            "lr_scheduler_type": trial.suggest_categorical("lr_scheduler_type",["linear", "cosine", "constant_with_warmup", "constant", "polynomial"])
         }
 
         for key, value in params.items():
@@ -727,7 +713,7 @@ def data_train():
         hp_space=hp_space,
         direction="maximize",  # Maximize the METEOR score
         backend="optuna",
-        n_trials=1,
+        n_trials=30,
         compute_objective=lambda metrics: metrics["eval_meteor"], # Objective is eval_meteor
         pruner=optuna.pruners.MedianPruner(
             n_startup_trials=5,
@@ -745,8 +731,8 @@ def data_train():
 
     #*******************************************************************
     #*******************************************************************
-    tokenized_train_dataset, tokenized_eval_dataset, tokenized_test_dataset = data_preprocess(dcnt_limit=100, test_size=0.1, eval_size=0.1)
-    # tokenized_train_dataset, tokenized_eval_dataset, tokenized_test_dataset = data_preprocess(test_size=0.1, eval_size=0.1)
+    # tokenized_train_dataset, tokenized_eval_dataset, tokenized_test_dataset = data_preprocess(dcnt_limit=4500, test_size=0.1, eval_size=0.1)
+    tokenized_train_dataset, tokenized_eval_dataset, tokenized_test_dataset = data_preprocess(test_size=0.1, eval_size=0.1)
     #*******************************************************************
     #*******************************************************************
 
