@@ -1,11 +1,16 @@
-version: "3.9"
+version: "3.8"
+
 services:
-  sign-model-api:
-    build:
-      context: .
-      dockerfile: Dockerfile
+  api:
+    build: .
+    container_name: sign-api
     ports:
       - "8000:8000"
+    environment:
+      # 필요 시 .env 파일을 만들어 OPENAI_API_KEY 지정 가능
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - MODEL_DIR=/app/model
+      - TF_CPP_MIN_LOG_LEVEL=2
     volumes:
-      - ./model:/model   # 모델 교체 시 편리
-    restart: unless-stopped
+      - ./model:/app/model:ro   # 모델/라벨 read-only 마운트
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 1
