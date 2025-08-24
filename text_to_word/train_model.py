@@ -693,6 +693,19 @@ def data_train():
         print("  - Suggested hyperparameters:")
         batch_size = trial.suggest_categorical("per_device_batch_size", [16, 32])
 
+        # 기존 params 딕셔너리를 주석 처리합니다.
+        # params = {
+        #     "learning_rate": trial.suggest_float("learning_rate", 5e-6, 5e-5, log=True),
+        #     "num_train_epochs": trial.suggest_int("num_train_epochs", 5, 40),
+        #     "weight_decay": trial.suggest_float("weight_decay", 0.0, 0.1),
+        #     "per_device_train_batch_size": batch_size,
+        #     "per_device_eval_batch_size": batch_size,
+        #     "generation_num_beams": trial.suggest_int( "generation_num_beams", 3, 10),
+        #     "lr_scheduler_type": trial.suggest_categorical("lr_scheduler_type",["linear", "cosine", "constant_with_warmup", "constant", "polynomial"])
+        # }
+
+        # 새로운 params 딕셔너리에 optim을 추가합니다.
+        # Original params dictionary
         params = {
             "learning_rate": trial.suggest_float("learning_rate", 5e-6, 5e-5, log=True),
             "num_train_epochs": trial.suggest_int("num_train_epochs", 5, 40),
@@ -700,8 +713,33 @@ def data_train():
             "per_device_train_batch_size": batch_size,
             "per_device_eval_batch_size": batch_size,
             "generation_num_beams": trial.suggest_int( "generation_num_beams", 3, 10),
-            "lr_scheduler_type": trial.suggest_categorical("lr_scheduler_type",["linear", "cosine", "constant_with_warmup", "constant", "polynomial"])
+            "lr_scheduler_type": trial.suggest_categorical("lr_scheduler_type",["linear", "cosine", "constant_with_warmup", "constant", "polynomial"]),
+            # 추천된 옵티마이저 목록으로 수정하여 다양한 특성을 가진 옵티마이저들을 비교합니다.
+            # "optim": trial.suggest_categorical("optim", ["adamw_torch", "adafactor", "sgd", "adagrad"]) # 유효한 옵티마이저 목록
+            "optim": trial.suggest_categorical("optim", ["adamw_torch", "adafactor", "lion_32bit", "galore_adamw", "schedule_free_adamw"]) # 추천 옵티마이저 탐색 목록
+            # "optim": trial.suggest_categorical("optim", ["galore_adamw"]) # 추천 옵티마이저 탐색 목록
         }
+        
+        # GaLore 옵티마이저를 사용하기 위해 optim_target_modules를 추가합니다.
+        # Add optim_target_modules to use the GaLore optimizer.
+        # params = {
+        #     "learning_rate": trial.suggest_float("learning_rate", 5e-6, 5e-5, log=True),
+        #     "num_train_epochs": trial.suggest_int("num_train_epochs", 5, 40),
+        #     "weight_decay": trial.suggest_float("weight_decay", 0.0, 0.1),
+        #     "per_device_train_batch_size": batch_size,
+        #     "per_device_eval_batch_size": batch_size,
+        #     "generation_num_beams": trial.suggest_int( "generation_num_beams", 3, 10),
+        #     "lr_scheduler_type": trial.suggest_categorical("lr_scheduler_type",["linear", "cosine", "constant_with_warmup", "constant", "polynomial"]),
+        #     "optim": "schedule_free_adamw",
+        #     # GaLore는 메모리 효율적인 학습을 위해 특정 모듈을 타겟으로 지정해야 합니다.
+        #     # GaLore requires specifying target modules for memory-efficient training.
+        #     # KoBART와 같은 Transformer 모델에서는 attention 레이어의 'q_proj'와 'v_proj'를 지정하는 것이 일반적입니다.
+        #     # For Transformer models like KoBART, it is common to specify 'q_proj' and 'v_proj' of the attention layers.
+        #     # "optim_target_modules": ["q_proj", "v_proj"]
+        # }
+
+        if params["optim"] == "galore_adamw":
+            params["optim_target_modules"] = ["q_proj", "v_proj"]
 
         for key, value in params.items():
             print(f"    - {key}: {value}")
@@ -713,7 +751,7 @@ def data_train():
         hp_space=hp_space,
         direction="maximize",  # Maximize the METEOR score
         backend="optuna",
-        n_trials=30,
+        n_trials=35,
         compute_objective=lambda metrics: metrics["eval_meteor"], # Objective is eval_meteor
         pruner=optuna.pruners.MedianPruner(
             n_startup_trials=5,
@@ -731,7 +769,7 @@ def data_train():
 
     #*******************************************************************
     #*******************************************************************
-    # tokenized_train_dataset, tokenized_eval_dataset, tokenized_test_dataset = data_preprocess(dcnt_limit=4500, test_size=0.1, eval_size=0.1)
+    # tokenized_train_dataset, tokenized_eval_dataset, tokenized_test_dataset = data_preprocess(dcnt_limit=450, test_size=0.1, eval_size=0.1)
     tokenized_train_dataset, tokenized_eval_dataset, tokenized_test_dataset = data_preprocess(test_size=0.1, eval_size=0.1)
     #*******************************************************************
     #*******************************************************************
