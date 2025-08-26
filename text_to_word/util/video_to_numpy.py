@@ -13,7 +13,7 @@ with open("/home/202044005/KSEB/text_to_word/preprocessed_data/unique_glosses.js
 
 
 
-# TARGET_LABELS = ["가다1","오다1","집1","물건2","결정1","준비1","원인1","이전1","때2","먹다1"]
+TARGET_LABELS = ["가다1","오다1","집1","물건2","결정1","준비1","원인1","이전1","때2","먹다1"]
 PER_LABEL_LIMIT = 500
 BUFFER_FRAMES = 5
 MIN_VALID_FRAMES = 7          # 🔸 너무 짧은 구간은 버림

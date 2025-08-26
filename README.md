@@ -220,16 +220,39 @@ docker stop kseb-t2g-server
 
     ```json
     [
-      {
-        "left_hand":[{"name":"WRIST", "x":..., "y":..., "z":...},...],
-        "right_hand":[{"name":"WRIST", "x":..., "y":..., "z":...},...],
-        "pose": [{"name":"NOSE","x":...,"y":...,"z": ...,"visibility": ...},...]
+      {"left_hand": [
+          {
+            "name": "WRIST",
+            "x": 0.5,
+            "y": 0.6,
+            "z": -0.4
+          }
+        ],
+        "right_hand": [
+          {
+            "name": "WRIST",
+            "x": 0.4,
+            "y": 0.6,
+            "z": -0.35
+          }
+        ],
+        "pose": [
+          {
+            "name": "NOSE",
+            "x": 0.45,
+            "y": 0.2,
+            "z": -0.8,
+            "visibility": 0.98
+          },
+          "..."
+        ]
       },
       {
-        "left_hand": [...],
-        ...
-      }, 
-      ...
+        "left_hand": "[...]",
+        "right_hand": "[...]",
+        "pose": "[...]"
+      },
+      "..."
     ]
     ```
   * 모델 로드 불가(503):
