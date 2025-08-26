@@ -226,7 +226,8 @@ docker stop kseb-t2g-server
             "x": 0.5,
             "y": 0.6,
             "z": -0.4
-          }
+          },
+          "..."
         ],
         "right_hand": [
           {
@@ -234,7 +235,8 @@ docker stop kseb-t2g-server
             "x": 0.4,
             "y": 0.6,
             "z": -0.35
-          }
+          },
+          "..."
         ],
         "pose": [
           {
