@@ -85,7 +85,7 @@ docker compose down
 ```json
 {
   "session_id": "user-or-device-uuid",
-  "keypoints": [0.12, 0.03, ...]  // 길이 194
+  "keypoints": [0.12, 0.03, "..."]  // 길이 194
 }
 ```
 
