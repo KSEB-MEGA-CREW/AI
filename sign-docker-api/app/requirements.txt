@@ -1,6 +1,13 @@
-fastapi==0.116.0
-uvicorn==0.35.0
-tensorflow==2.10.0
-numpy==1.24.0
-python-multipart
-pydantic==2.11.7
+fastapi==0.110.0
+uvicorn[standard]==0.27.1
+python-multipart==0.0.9
+
+pillow==10.2.0
+numpy==1.26.4
+mediapipe==0.10.14
+opencv-python-headless==4.10.0.84
+
+tensorflow-cpu==2.13.0
+
+pydantic==2.5.3
+openai==0.28.1    # (선택) 없으면 translate-words는 규칙기반으로 동작
