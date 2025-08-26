@@ -1,5 +1,18 @@
 import json
 import os
+import re
+
+# This function cleans a gloss ID by removing whitespace and replacing characters that are invalid in filenames.
+# 이 함수는 공백을 제거하고 파일 이름에 사용할 수 없는 문자를 대체하여 gloss ID를 정리합니다.
+def clean_gloss_id(gloss_id):
+    # Remove all whitespace characters.
+    # 모든 공백 문자를 제거합니다.
+    cleaned_id = re.sub(r'\s+', '', gloss_id)
+    # Replace characters that are invalid in filenames with an underscore.
+    # 파일 이름에 사용할 수 없는 문자를 밑줄로 대체합니다.
+    cleaned_id = re.sub(r'[:/?*<>|"]', '_', cleaned_id)
+    return cleaned_id
+
 
 # This function processes JSON files one by one using a generator, which is memory efficient.
 # 이 함수는 제너레이터를 사용하여 JSON 파일을 하나씩 처리하므로 메모리 효율적입니다.
@@ -45,9 +58,9 @@ def process_files_generator(root_folder, output_path):
                             # Extract the Korean text from the data.
                             # 데이터에서 한국어 텍스트를 추출합니다.
                             korean_text = data['krlgg_sntenc']['koreanText']
-                            # Extract the gloss IDs from the data.
-                            # 데이터에서 gloss ID를 추출합니다.
-                            gloss_ids = [gesture['gloss_id'] for gesture in data['sign_script']['sign_gestures_strong']]
+                            # Extract and clean the gloss IDs from the data.
+                            # 데이터에서 gloss ID를 추출하고 정리합니다.
+                            gloss_ids = [clean_gloss_id(gesture['gloss_id']) for gesture in data['sign_script']['sign_gestures_strong']]
                             
                             # Create a dictionary with the processed data.
                             # 처리된 데이터로 딕셔너리를 생성합니다.

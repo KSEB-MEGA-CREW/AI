@@ -211,7 +211,8 @@ if __name__ == "__main__":
     # 7. 저장된 토크나이저와 모델 다시 로드하여 확인
     print("\n--- 저장된 새 토크나이저와 모델 로드 테스트 ---")
 
-    loaded_model, loaded_tokenizer = load_model()
+    loaded_model = load_model()
+    loaded_tokenizer = load_tokenizer()
     # loaded_tokenizer = AutoTokenizer.from_pretrained(CUSTOM_TOKENIZER)
     # loaded_model = AutoModelForSeq2SeqLM.from_pretrained(CUSTOM_TOKENIZER)
 
