@@ -12,7 +12,7 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/*
 
 # Install Miniconda in the /opt/conda directory
-ENV CONDA_DIR /opt/conda
+ENV CONDA_DIR=/opt/conda
 RUN curl -sL "https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh" -o miniconda.sh && \
     bash miniconda.sh -b -p $CONDA_DIR && \
     rm miniconda.sh && \
