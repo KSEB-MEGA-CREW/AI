@@ -24,8 +24,8 @@ ENV PATH=$CONDA_DIR/bin:$PATH
 # Set the working directory for the application
 WORKDIR /app
 
-# Copy the Conda environment file into the container
-COPY environment.final.yml .
+# Copy the Conda environment file and requirements into the container
+COPY environment.final.yml requirements.txt ./
 
 # Update conda to the latest version and accept the Terms of Service for the default channels.
 # Accept the Terms of Service for the default channels using the official command.
@@ -35,11 +35,13 @@ RUN conda tos accept --override-channels --channel defaults
 # It's good practice to update conda itself. Now that ToS is accepted, this should work.
 RUN conda update -n base -c defaults conda -y
 
-# Create the Conda environment from the environment.yml file.
-
-# This command sets up the 'KSEB' environment with all specified conda and pip packages.
-# This step can take a significant amount of time due to the large number of dependencies.
+# Create the Conda environment from the environment.yml file (conda packages only).
+# This command sets up the 'KSEB' environment with conda packages only.
 RUN conda env create -f environment.final.yml
+
+# Install PyTorch and other pip packages separately in the conda environment
+# This approach is more reliable than mixing conda and pip in the same environment file
+RUN conda run -n kseb-prod pip install -r requirements.txt
 
 # Copy the rest of the application source code into the container
 COPY . .
