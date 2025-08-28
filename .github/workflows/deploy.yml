@@ -66,7 +66,37 @@ jobs:
             -e AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }} \
             -e AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }} \
             --restart unless-stopped \
+            --health-cmd="curl -f http://localhost:1958/ || exit 1" \
+            --health-interval=30s \
+            --health-timeout=10s \
+            --health-retries=3 \
+            --health-start-period=300s \
             ${{ steps.build-image.outputs.image }}
+          
+          # Wait for container to be healthy
+          echo "Waiting for container to be healthy..."
+          for i in {1..20}; do
+            if [ "$(docker inspect --format='{{.State.Health.Status}}' kseb-t2g-server)" = "healthy" ]; then
+              echo "Container is healthy!"
+              break
+            fi
+            if [ $i -eq 20 ]; then
+              echo "Container health check failed after 10 minutes"
+              docker logs kseb-t2g-server --tail 50
+              exit 1
+            fi
+            echo "Waiting... ($i/20)"
+            sleep 30
+          done
+          
+          # Verify application is responding
+          if curl -f http://localhost:1958/; then
+            echo "Application is responding successfully"
+          else
+            echo "Application is not responding"
+            docker logs kseb-t2g-server --tail 50
+            exit 1
+          fi
           
           # Clean up old images
           docker image prune -f
